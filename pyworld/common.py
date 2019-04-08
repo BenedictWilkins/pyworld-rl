@@ -111,14 +111,16 @@ class LearningAgent(Agent):
     def train(self):
         pass
          
-class InfoWriter:
+class Info:
     
     def __init__(self, summary_writer = None, info_interval=10):
         self.info_interval = info_interval
         self.summary_writer = summary_writer
         self.episode_rewards = []
         self.current_episode_reward = 0
-    
+        self.info_labels = ['avg_reward/' + str(self.info_interval)]
+        self.info = {k:0. for k in self.info_labels}
+       
     def __call__(self, agent, obs):
         (state, action, reward, nstate, time) = obs
         #update tensorboard
@@ -132,10 +134,10 @@ class InfoWriter:
             if time.episode % self.info_interval == 0:
                 rs = self.episode_rewards[-self.info_interval:]
                 avg_rwds = sum(rs) / len(rs) 
-                info = {'avg_reward/' + str(self.info_interval) : avg_rwds}
-                info.update(agent.info)
-                self.print_info(time, info)
-                
+                self.info = {self.info_labels[0] : avg_rwds}
+                self.info.update(agent.info)
+                self.print_info(time, self.info)
+        
     def update_summary(self, agent, global_step):
         for k,v in agent.summary_info.items():
             self.summary_writer.add_scalar(k, v, global_step) #TODO deal with non scalars
