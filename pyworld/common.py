@@ -32,50 +32,8 @@ def is_iterable(arg):
         return False
     else:
         return True
-    
-class Sensor(ABC):
-    
-    def __init__(self, callback, virtual=False):
-        self.virtual = virtual
-    
-    @abstractmethod
-    def __call__(self, obs):
-        pass    
 
-class Agent(ABC):
-    
-    def __init__(self, sensors=None, actuators=None):
-        assert sensors is None or is_iterable(sensors)
-        assert actuators is None or is_iterable(actuators)
 
-        if sensors:  
-            self.sensors = sensors
-        else:
-            self.sensor = [lambda obs : self.sense(obs)]
-        if actuators:
-            self.actuators = actuators
-        else:
-            self.actuators = [lambda acts : self.attempt(acts)]
-         
-        #debugging info
-        self.info = {}
-        self.summary_info = {}
-        self.update_summary = False
-   
-    @abstractmethod
-    def attempt(self, acts):
-        pass
-    
-    def __attempt__(self, args):
-        return self.actuators[0](self.attempt(*args))  #TOOD multiple actuators?
-    
-    @abstractmethod
-    def sense(self, obs):
-        pass
-    
-    def __sense__(self, obs):
-        for s in self.sensors:
-            s(obs)
 
 #TODO make more efficient - dont create a class every time this is called.
 def batch(batch_labels):
@@ -83,33 +41,7 @@ def batch(batch_labels):
      t.__new__.__defaults__ = tuple([[] for _ in range(len(batch_labels))])
      return t
     
-class RandomAgent(Agent):
-    
-    def __init__(self,):
-        super(RandomAgent, self).__init__(None,None)
-        
-    def attempt(self, acts):
-        return acts.sample()
-        
-    def sense(self, obs):
-        pass
-    
-class LearningAgent(Agent):
-    
-    def __init__(self, model, optimizer, batch_labels=['state','action','reward'], batch_size=16, sensors=None, actuators=None):
-         super(LearningAgent, self).__init__(sensors, actuators)
-         self.optimizer = optimizer
-         self.model = model
-         self.batch = batch(batch_labels)()
-         self.batch_size = batch_size
-         
-    @abstractmethod
-    def loss(self):
-        pass
-    
-    @abstractmethod
-    def train(self):
-        pass
+
          
 class Info:
     
@@ -128,7 +60,7 @@ class Info:
             self.update_summary(agent, time.global_step)
 
         self.current_episode_reward += reward
-        if time.end:
+        if time.done:
             self.episode_rewards.append(self.current_episode_reward)
             self.current_episode_reward = 0 
             if time.episode % self.info_interval == 0:
@@ -148,77 +80,6 @@ class Info:
         for k,v in info.items():
             self.summary_writer.add_scalar(k, v, time.global_step) #TODO deal with non scalars
             print('  %s:%s' %(k,v))            
-
-class GymSimulator:
-    
-    def __init__(self, env, agent, debug=None, render=False):
-        assert isinstance(env, gym.Env) or isinstance(env, str)
-        if isinstance(env, gym.Env):
-            self.env = env
-        else:
-            self.env = gym.make(env)
-        self.agent = agent
-        self.running = False
-        self.global_step = 0
-        self.step = 0
-        self.episode = 0
-        self.render = render
-        self.debug = debug
-    
-    def close(self):
-        self.env.close()
-        
-    def __iter__(self):
-        self.running = True
-        t, state = self.__reset__env__()
-        yield t
-        while(self.running):
-            action = self.agent.__attempt__((state, self.env.action_space))
-            nstate, reward, done, _ = self.env.step(action)
-            if self.render:
-                self.env.render()
-            self.step += 1
-            self.global_step += 1
-            t = Time(self.episode, self.step, self.global_step, done)
-            self.agent.__sense__((state, action, reward, nstate, t))
-            if self.debug:
-                self.debug(self.agent, (state,action,reward,nstate,t))
-            state = nstate
-            yield t
-            if(done):
-               t, state = self.__reset__env__()
-               yield t
-               
-    def __reset__env__(self):
-        self.episode += 1
-        self.step = 0
-        state = self.env.reset()
-        if self.render:
-            self.env.render()
-        t = Time(self.episode, self.step, self.global_step, False)
-        return t, state
-               
-class EpisodicSensor:
-    
-    def __init__(self, callback):
-        self.__reset__()
-        self.callback = callback
-        
-    def __reset__(self):
-        self.states = []
-        self.actions = []
-        self.rewards = []
-        self.total_reward = 0
-    
-    def __call__(self, obs):
-        state, action, reward, nstate, time = obs
-        self.states.append(state)
-        self.actions.append(action)
-        self.rewards.append(reward)
-        self.total_reward += reward
-        if(time.end):
-            self.callback((self.states, self.actions, self.rewards, time.episode, self.total_reward))
-            self.__reset__()
             
 class UnrollSensor1:
     
@@ -237,7 +98,7 @@ class UnrollSensor1:
 
         self.total_reward *= self.gamma
         self.total_reward += reward
-        if time.end or time.step % self.steps == 0:
+        if time.done or time.step % self.steps == 0:
             #print("callback: ", time)
             self.callback((self.state_i, self.action_i, self.total_reward, state, time))
             self.state_i = pstate
@@ -303,15 +164,6 @@ class UnrollSensor:
 
 
 
-class ProbabilisticActuator:
-    
-    def __init__(self):
-        pass
-    
-    def __call__(self, action_probs):
-        action_probs = action_probs.detach().numpy()
-        #print('action probs:' , action_probs)
-        return np.random.choice(len(action_probs), p=action_probs)
     
     
    
