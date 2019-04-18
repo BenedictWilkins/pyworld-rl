@@ -7,6 +7,8 @@ Created on Wed Apr 17 17:21:27 2019
 """
 import numpy as np
 from abc import ABC, abstractmethod
+import collections
+import cv2
 import copy
 from . import common as c
 
@@ -54,6 +56,10 @@ class Sensor(ABC):
     
     def __init__(self, callback=None):
         self._callback = callback
+        
+    @abstractmethod
+    def __reset__(self, *args):
+        pass
 
     @abstractmethod
     def __call__(self, *args):
@@ -66,38 +72,33 @@ class SimpleSensor(Sensor):
     
     def __call__(self, obs):
         self._callback(obs)
+        
+    def __reset__(self, obs):
+        state, time = obs
+        self._callback((0.0, None, state, time))
 
     
 class BatchSensor(Sensor):
     
-    batch_labels = ['pstate', 'action', 'reward', 'state', 'done']
-    
-    def __init__(self, batch_size = 16, callback=None):
+    def __init__(self, batch_labels = ['action', 'reward', 'state'], batch_size = 16, callback=None):
         super(BatchSensor, self).__init__(callback)
-        Batch = c.batch(BatchSensor.batch_labels)
+        Batch = c.batch(batch_labels)
         self.batch = Batch()
         self.batch_size = batch_size
-
+    
+    def batch_append(self, *obs):
+        for i in range(len(obs)):
+            self.batch[i].append(obs[i])
+    
+    def batch_full(self):
+        return len(self.batch[0]) == self.batch_size
+    
+    def batch_clear(self):
+        for s in self.batch:
+            s.clear()
         
-    def __call__(self, obs):
-        (pstate, action, reward, state, time) = obs
-        #print(pstate, reward, action, time)
-        self.batch.pstate.append(pstate)
-        self.batch.action.append(action)
-        self.batch.state.append(state)
-        self.batch.reward.append(reward)
-        self.batch.done.append(time.done)
-       
-        if time.global_step % self.batch_size == 0:
-            self._callback(self.batch)
-            self.batch.pstate.clear()
-            self.batch.action.clear()
-            self.batch.reward.clear()
-            self.batch.state.clear()
-            self.batch.done.clear()
-            
               
-class EpisodicSensor(Sensor):
+class EpisodicSensor(BatchSensor):
     '''
         The EpisodicSensor collects actions, rewards and states in a 
         batch whose size is the number of steps of a given episode. 
@@ -105,32 +106,30 @@ class EpisodicSensor(Sensor):
         Note: The last (terminal) state of an episode is ignored by this sensor.
     '''
     
-    batch_labels = ['action', 'reward', 'state']
-    
     def __init__(self, callback=None):
-       super(EpisodicSensor, self).__init__(callback)
-       Batch = c.batch(EpisodicSensor.batch_labels)
-       self.batch = Batch()
+       super(EpisodicSensor, self).__init__(batch_labels=['state', 'action', 'reward', 'time'], callback=callback)
        self.total_reward = 0
+       self.state = None
     
+    def __reset__(self, obs):
+        state, time = obs
+        self.state = state
+        
     def __call__(self, obs):
-        (pstate, action, reward, _, time) = obs
-      
-        self.batch.action.append(action)
-        self.batch.reward.append(reward)
-        self.batch.state.append(pstate)
+        action, reward, state, time = obs
+        
+        self.batch_append(self.state, action, reward, time)
+        self.state = state
         
         if time.done:
             self._callback(self.batch)
-            self.batch.action.clear()
-            self.batch.reward.clear()
-            self.batch.state.clear()
+            self.batch_clear()
         
                  
 class UnrollSensor(BatchSensor):
     
     def __init__(self, batch_size = 16, callback=None, gamma=0.99, steps=3):
-        super(UnrollSensor, self).__init__(batch_size, callback)
+        super(UnrollSensor, self).__init__(batch_labels=['state', 'action', 'reward', 'nstate', 'time'], callback=callback)
         self.gamma =  gamma
         self.steps = steps
         self.total_reward = 0
@@ -138,25 +137,23 @@ class UnrollSensor(BatchSensor):
         self.unroll_actions = [None] * steps
         self.unroll_times = [None] * steps
         self.unroll_rewards = np.zeros(steps)
+        self.state = None
 
+    def __reset__(self, obs ):
+        state, time = obs
+        self.state = state
 
     def __call__(self, obs):
-        pstate, action, reward, state, time = obs
+        action, reward, state, time = obs
         #print(pstate, time)
         
         i = time.step % self.steps
         
-        r_state = self.unroll_states[i]
-        r_action = self.unroll_actions[i]
-        r_time = self.unroll_times[i]
-        r_reward = self.unroll_rewards[i]
         #print(pstate, time)
-        if r_state is not None:
-            #print('i:', i, r_reward)
-            super(UnrollSensor, self).__call__((r_state, r_action, r_reward, pstate, r_time))
-            #self.callback((r_state, r_action, r_reward, pstate, r_time))
+        if self.unroll_states[i] is not None:
+            self.batch_append(self.unroll_states[i], self.unroll_actions[i], self.unroll_rewards[i], self.state, self.unroll_times[i])
        
-        self.unroll_states[i] = pstate
+        self.unroll_states[i] = self.state
         self.unroll_actions[i] = action
         self.unroll_times[i] = copy.copy(time)
         self.unroll_rewards[i] = 0
@@ -176,17 +173,69 @@ class UnrollSensor(BatchSensor):
                 if self.unroll_states[k] is not None:
                    # print(k, self.unroll_rewards[k])
                     #self._callback((self.unroll_states[k], self.unroll_actions[k], self.unroll_rewards[k], pstate, self.unroll_times[k]))
-                    super(UnrollSensor, self).__call__((self.unroll_states[k], self.unroll_actions[k], self.unroll_rewards[k], pstate, self.unroll_times[k]))
+                    self.batch_append(self.unroll_states[k], self.unroll_actions[k], self.unroll_rewards[k], self.state, self.unroll_times[k])
+
             self.unroll_states = [None] * self.steps
             self.unroll_actions = [None] * self.steps
             self.unroll_times = [None] * self.steps
             self.unroll_rewards = np.zeros(self.steps)
         
-       
+        self.state = state
+        
+    def batch_append(self, *args):
+        super(UnrollSensor, self).batch_append(*args)
+        if self.batch_full():
+            self._callback(self.batch)
+            self.batch_clear()
         
         
-            
-            
+        
+    
+class AtariSensor(Sensor):
+    
+    def __init__(self, callback, frames=4):
+        super(AtariSensor, self).__init__(callback)
+        self.transform = AtariTransform()
+        self.buffer = collections.deque([0]*frames, maxlen = frames)
+        self.state = None
+        
+    def __reset__(self, obs):
+        state, _ = obs
+        self.buffer.append(state)
+        self.state = np.array(self.buffer)
+        
+    def __call__(self, obs):
+        action, reward, state, time = obs
+        self.buffer.append(state)
+        nstate = np.array(self.buffer)
+        self._callback((state, action, reward, nstate, time))
+        self.state = nstate
+
+class StateTransform(ABC):
+    
+    def __init__(self):
+        pass
+    
+    @abstractmethod
+    def __call__(self, state):
+        pass
+    
+class AtariTransform(StateTransform):
+    
+    def __init__(self, out_shape=[1,84,84]):
+        self.in_shape = [-1, -1, 3]
+        self.out_shape = out_shape
+    
+    def __call__(self, state):
+        if state.size == 210 * 160 * 3:
+             img = np.reshape(state, [210, 160, 3]).astype(np.float32)
+        elif state.size == 250 * 160 * 3:
+            img = np.reshape(state, [250, 160, 3]).astype(np.float32)
+        else:
+            assert False, "Unknown resolution."
+        img = (img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114) 
+        img = cv2.resize(img, (84, 110), interpolation=cv2.INTER_AREA)
+        return np.reshape(img[18:102, :], [1, 84, 84]) / 255.0
         
 
     

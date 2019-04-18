@@ -75,6 +75,7 @@ class GymSimulator(Simulator):
     def __iter__(self):
         self.running = True
         state = self.__reset__env__()
+        
         yield self.time
         while(self.running):
             self.agents[0].attempt(state)
@@ -86,7 +87,7 @@ class GymSimulator(Simulator):
             self.time.step += 1
             self.time.global_step += 1
             for sensor in self.agents[0].sensors:
-                sensor((state, action, reward, nstate, self.time))
+                sensor((action, reward, nstate, self.time))
             if self.debug:
                 self.debug(self.agents[0], (state, action, reward, nstate, self.time))
             state = nstate
@@ -102,4 +103,6 @@ class GymSimulator(Simulator):
         state = self.env.reset()
         if self.render:
             self.env.render()
+        for sensor in self.agents[0].sensors:
+            sensor.__reset__((state, self.time))
         return state
