@@ -12,6 +12,7 @@ import gym
 import numpy as np
 import random
 from abc import ABC, abstractmethod
+import collections
 
 def torch_cuda():
     parser = argparse.ArgumentParser()
@@ -23,9 +24,7 @@ def torch_cuda():
     
 Time = namedtuple('Time', ['episode', 'step', 'global_step', 'end'])
 
-
-
-def is_iterable(arg):
+def isiterable(arg):
     try:
        iter(arg)
     except TypeError:
@@ -45,41 +44,61 @@ def batch(batch_labels):
          
 class Info:
     
-    def __init__(self, summary_writer = None, info_interval=10):
+    def __init__(self, summary_writer = None, info_interval=1000):
         self.info_interval = info_interval
         self.summary_writer = summary_writer
-        self.episode_rewards = []
-        self.current_episode_reward = 0
         self.info_labels = ['avg_reward/' + str(self.info_interval)]
         self.info = {k:0. for k in self.info_labels}
+        self.print_info = []
+        self.print_info.extend(self.info_labels) #things to print
        
-    def __call__(self, agent, obs):
+    def __call__(self, obs):
         (state, action, reward, nstate, time) = obs
         #update tensorboard
-        if agent.update_summary and self.summary_writer:
-            self.update_summary(agent, time.global_step)
-
-        self.current_episode_reward += reward
-        if time.done:
-            self.episode_rewards.append(self.current_episode_reward)
-            self.current_episode_reward = 0 
-            if time.episode % self.info_interval == 0:
-                rs = self.episode_rewards[-self.info_interval:]
-                avg_rwds = sum(rs) / len(rs) 
-                self.info = {self.info_labels[0] : avg_rwds}
-                self.info.update(agent.info)
-                self.print_info(time, self.info)
+        if time.global_step % self.info_interval == 0:
+            self.update_summary(time.global_step)
+            self.print_info(time)
         
-    def update_summary(self, agent, global_step):
-        for k,v in agent.summary_info.items():
+    def update_summary(self, global_step):
+        for k,v in self.info.items():
             self.summary_writer.add_scalar(k, v, global_step) #TODO deal with non scalars
-        agent.update_summary = False
                 
-    def print_info(self, time, info):
+    def print_info(self, time):
         print('INFO %d:' %(time.episode))
-        for k,v in info.items():
-            self.summary_writer.add_scalar(k, v, time.global_step) #TODO deal with non scalars
-            print('  %s:%s' %(k,v))            
+        for k in self.print_info:
+            print('  %s:%s' %(k,self.info[k]))      
+
+class Tracker:
+    
+    def __init__(self):
+        self.value = None
+    
+    def update(self, obs):
+        pass
+    
+    def get(self):
+        pass
+    
+    def done(self):
+        pass
+    
+class RewardTracker :
+    
+    def __init__(self, interval=10):
+        self.episode_rewards = collections.deque(maxlen=interval)
+        self.current_episode_reward = 0
+        self.interval = 10
+    
+    def update(self, obs):
+        _, _, reward, _, time = obs
+        self.current_episode_reward += reward
+                         
+    def get(self):
+        self.value = sum(self.episode_rewards) / len(self.episode_rewards)
+        
+    def done(self):
+         self.episode_rewards.append(self.current_episode_reward)
+         self.current_episode_reward = 0 
             
 class UnrollSensor1:
     

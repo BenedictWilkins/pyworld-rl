@@ -9,6 +9,7 @@ Created on Wed Apr 17 17:25:51 2019
 import gym
 from abc import ABC, abstractmethod
 
+
 class Time:
     
     def __init__(self):
@@ -29,17 +30,10 @@ class Simulator(ABC):
     
     def __init__(self):
         self.running = False
-        self.events = []
         self.agents = []
-        
-    def add_event(self, event):
-        self.events.append(event)
         
     def add_agent(self, agent):
         self.agents.append(agent)
-        #add the callback for actuators!
-        for actuator in agent.actuators:
-            actuator._callback = self.add_event
             
     def stop(self):
         self.running = False
@@ -68,41 +62,52 @@ class GymSimulator(Simulator):
         self.env.close()
     
     def add_agent(self, agent):
-        assert len(agent.actuators) == 1, 'An OpenAI-gym simulator only permits agents with a single actuator.'
         assert len(self.agents) <= 1, 'An OpenAi-gym simulator only permits single agent environments.'
         super(GymSimulator, self).add_agent(agent)
         
     def __iter__(self):
         self.running = True
-        state = self.__reset__env__()
+        sense_call = self.agents[0].sensor.__sense__()
+        sense_call.send(None)
+        reset_call = self.agents[0].sensor.__reset__()
+        reset_call.send(None)
+        act_call = self.agents[0].actuator.__act__()
         
+        reset = [reset_call]
+        sense = [sense_call]
+        act = [act_call]
+        
+        state = self.__reset__env__(reset)
+
         yield self.time
         while(self.running):
-            self.agents[0].attempt(state)
-            action = self.events.pop()
-            action = action % self.env.action_space.n #TODO continuous actions
+            action = next(act[0]) #combine all actions from all agents into 1?7
             nstate, reward, self.time.done, _ = self.env.step(action)
             if self.render:
                 self.env.render()
             self.time.step += 1
             self.time.global_step += 1
-            for sensor in self.agents[0].sensors:
-                sensor((action, reward, nstate, self.time))
+            
+            for s in sense:
+                s.send((action, reward, nstate, self.time))
+                
             if self.debug:
                 self.debug(self.agents[0], (state, action, reward, nstate, self.time))
+                
             state = nstate
+            
             yield self.time
             if(self.time.done):
-               state = self.__reset__env__()
+               state = self.__reset__env__(reset)
                yield self.time
                
-    def __reset__env__(self):
+    def __reset__env__(self, resets):
         self.time.episode += 1
         self.time.step = 0
         self.time.done = False
         state = self.env.reset()
         if self.render:
             self.env.render()
-        for sensor in self.agents[0].sensors:
-            sensor.__reset__((state, self.time))
+        for r in resets:
+            r.send((state, self.time))
         return state
