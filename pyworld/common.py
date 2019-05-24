@@ -13,6 +13,19 @@ import numpy as np
 import random
 from abc import ABC, abstractmethod
 import collections
+import time as datetime
+import copy
+
+import os as os
+
+
+def save_net(net, path):
+    pathn, filename = os.path.split(path)
+    if not os.path.exists(pathn):
+        os.makedirs(pathn)
+    if len(filename.split('.')) == 1:
+        filename += '.pt'
+    torch.save(net.state_dict(), path)
 
 def torch_cuda():
     parser = argparse.ArgumentParser()
@@ -20,9 +33,15 @@ def torch_cuda():
     args = parser.parse_args()
     print("cuda enabled = ", args.cuda)
     return torch.device("cuda" if args.cuda else "cpu")
-
     
 Time = namedtuple('Time', ['episode', 'step', 'global_step', 'end'])
+
+def hook(*hooks):
+    return {k:None for k in hooks}
+
+def info(lcls, hooks=None):
+    for k,v in hooks.items():
+        hooks[k] = lcls[k]
 
 def isiterable(arg):
     try:
@@ -32,6 +51,32 @@ def isiterable(arg):
     else:
         return True
 
+def device():  
+    if(torch.cuda.is_available()): 
+        return'cuda'
+    else:
+        return 'cpu'
+    
+GRADIENT_LABELS = ['grad/grad_max', 'grad/grad_l2']
+QVAL_LABELS = ['qval']
+
+#general debugging
+def gradient_info(net, info):
+        #gradient information
+        grad_max = 0.
+        grad_means = 0.
+        grad_count = 0
+        for p in net.parameters():
+            grad_max = max(grad_max, p.grad.abs().max().item())
+            grad_means += (p.grad ** 2).mean().sqrt().item()
+            grad_count += 1
+        
+        info.info_trackers['grad/grad_max'].step(grad_max)
+        info.info_trackers['grad/grad_l2'].step(grad_means / grad_count)
+        
+def qval_info(states, net, info):
+    qvals = net(states).detach().cpu().numpy()
+    info.info_trackers['qval'].step(np.mean(qvals.max(1)))
 
 
 #TODO make more efficient - dont create a class every time this is called.
@@ -41,65 +86,145 @@ def batch(batch_labels):
      return t
     
 
-         
-class Info:
-    
-    def __init__(self, summary_writer = None, info_interval=1000):
-        self.info_interval = info_interval
-        self.summary_writer = summary_writer
-        self.info_labels = ['avg_reward/' + str(self.info_interval)]
-        self.info = {k:0. for k in self.info_labels}
-        self.print_info = []
-        self.print_info.extend(self.info_labels) #things to print
-       
-    def __call__(self, obs):
-        (state, action, reward, nstate, time) = obs
-        #update tensorboard
-        if time.global_step % self.info_interval == 0:
-            self.update_summary(time.global_step)
-            self.print_info(time)
-        
-    def update_summary(self, global_step):
-        for k,v in self.info.items():
-            self.summary_writer.add_scalar(k, v, global_step) #TODO deal with non scalars
-                
-    def print_info(self, time):
-        print('INFO %d:' %(time.episode))
-        for k in self.print_info:
-            print('  %s:%s' %(k,self.info[k]))      
-
 class Tracker:
     
-    def __init__(self):
-        self.value = None
+    def __init__(self, enabled=True):
+        self.enabled = enabled
     
-    def update(self, obs):
+    @abstractmethod
+    def step(self, obs):
         pass
     
+    @abstractmethod
     def get(self):
-        pass
+        pass        
     
-    def done(self):
-        pass
+    def episode(self, _):
+        pass #TODO remove in favour of step at interval / episode
     
-class RewardTracker :
+    def summarise(self, summary_writer, label, step):
+        summary_writer.add_scalar(label, self.get(), step)
+
+class EpisodeAverageTracker(Tracker):
     
-    def __init__(self, interval=10):
-        self.episode_rewards = collections.deque(maxlen=interval)
-        self.current_episode_reward = 0
-        self.interval = 10
+    def __init__(self, size, enabled=False):
+        super(EpisodeAverageTracker, self).__init__(enabled)
+        self.values = collections.deque(maxlen=size)
+        self.current = 0
+        self.step = self.__step_first
     
-    def update(self, obs):
-        _, _, reward, _, time = obs
-        self.current_episode_reward += reward
-                         
-    def get(self):
-        self.value = sum(self.episode_rewards) / len(self.episode_rewards)
+    def __step_first(self, value):
+        self.current += value
+        self.step = self.__step_rest
+        self.enabled = True
         
-    def done(self):
-         self.episode_rewards.append(self.current_episode_reward)
-         self.current_episode_reward = 0 
+    def __step_rest(self, value):
+        self.current += value
+   
+    def episode(self, _):
+        self.values.append(self.current)
+        self.current = 0
+    
+    def get(self):
+        return sum(self.values) / len(self.values)
+
+class StepTracker(Tracker):
+    
+    def __init__(self, enabled=False):
+        super(StepTracker, self).__init__(enabled)
+        self.value = None
+        self.step = self.__step_first
+     
+    def __step_first(self, value):
+        self.value = value
+        self.step = self.__step_rest
+        self.enabled = True
+        
+    def __step_rest(self, value):
+        self.value = value
+        
+    def episode(self, _):
+        pass
+    
+    def get(self):
+        return self.value
+    
+class StepAverageTracker(Tracker):
+    
+    def __init__(self, size, enabled=False):
+        super(StepAverageTracker, self).__init__(enabled)
+        self.values = collections.deque(maxlen=size)
+        self.step = self.__step_first
+        
+    def episode(self, _):
+        pass #TODO remove 
+    
+    def __step_first(self, value):
+        self.values.append(value)
+        self.step = self.__step_rest
+        self.enabled = True
+        
+    def __step_rest(self, value):
+        self.values.append(value)
+    
+    def get(self):
+        return sum(self.values) / len(self.values)
+    
+    
+class FrameTracker(Tracker):
+    
+    def __init__(self, enabled=True):
+        super(FrameTracker, self).__init__(enabled)
+        self.real_time = datetime.time()
+        self.fps = 0.
+        
+    def step(self, _):
+        pass
+    
+    def episode(self, time):
+        n_real_time = datetime.time()
+        self.fps = time.step / ((n_real_time - self.real_time)) #time is given in seconds?????
+        self.real_time = n_real_time
+        
+    def get(self):
+        return self.fps
+        
+class Info:
+    
+    def __init__(self, summary_writer = None):
+        self.summary_writer = summary_writer
+        self.info_trackers = {}
+        self.print_trackers = []
+        
+    def add_tracker(self, label, tracker, pprint=False, enabled=True):
+        self.info_trackers[label] = tracker
+        if pprint:
+            self.print_trackers.append(label)
+     
+    def episode(self, time):
+        for v in self.info_trackers.values():
+            v.episode(time)
+        
+    def print_info(self, time):
+        print('INFO %s:' %(time))
+        for k in self.print_trackers:
+            print('  %s:%s' %(k,self.info_trackers[k].get()))  
             
+    def summarise(self, time, trackers=None):
+        if not trackers:
+            for k,v in self.info_trackers.items():
+                v.summarise(self.summary_writer, k, time.global_step)
+        else:
+            for k in trackers:
+                if self.info_trackers[k].enabled:
+                    self.info_trackers[k].summarise(self.summary_writer, k, time.global_step)
+                
+def batch_to_numpy(batch, types, copy=False):
+    return [np.array(batch[i], copy=copy, dtype=types[i]) for i in range(len(batch))]
+
+def batch_to_tensor(batch, types, device='cpu'):
+        return [types[i](batch[i]).to(device) for i in range(len(batch))]
+        '''    
 class UnrollSensor1:
     
     def __init__(self, callback, gamma=0.99, steps=2):
@@ -175,18 +300,6 @@ class UnrollSensor:
             self.unroll_rewards[(i + self.steps - j) % self.steps] += (gg * reward)
             gg *= self.gamma
         
-        
-            
-            
-        
-
-
-
-
-    
-    
-   
-'''   
 ag = RandomAgent()
 sim = GymSimulator('CartPole-v0', ag)
 

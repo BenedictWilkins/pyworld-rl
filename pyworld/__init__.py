@@ -9,5 +9,7 @@ Created on Tue Mar 19 13:12:44 2019
 from . import common
 from . import agent
 from . import simulate
+from . import params
+from . import model
 
-__all__ = ('common', 'agent', 'simulate')
+__all__ = ('common', 'agent', 'simulate', 'params', 'model')
