@@ -8,15 +8,23 @@ Created on Fri May 17 16:56:21 2019
 import os
 import pickle
 
-def name_file(file):
+def file(file):
+    o_file, ext = split_extension(file)
     i = 0
-    o_file = file
     while os.path.isfile(file):
         i += 1
-        file = o_file + "-" + str(i)
+        file = '.'.join([o_file + "(" + str(i) + ")", ext])
     return file
 
 def load(file):
     with open(file, 'rb') as fp:
         data = pickle.load(fp)
     return data
+
+def split_extension(file):
+    fsplit = file.split('.')
+    ext = ".".join(fsplit[1:])
+    return fsplit[0], ext
+    
+def has_extension(file):
+    return len(file.split('.')) > 1

@@ -8,16 +8,9 @@ Created on Mon Mar 18 11:54:57 2019
 import argparse
 import torch
 from collections import namedtuple
-import gym
 import numpy as np
-import random
-from abc import ABC, abstractmethod
-import collections
-import time as datetime
-import copy
 
 import os as os
-
 
 def save_net(net, path):
     pathn, filename = os.path.split(path)
@@ -80,144 +73,11 @@ def qval_info(states, net, info):
 
 
 #TODO make more efficient - dont create a class every time this is called.
+
 def batch(batch_labels):
      t = namedtuple('batch', batch_labels)
-     t.__new__.__defaults__ = tuple([[] for _ in range(len(batch_labels))])
+     #t.__new__.__defaults__ = tuple([[] for _ in range(len(batch_labels))])
      return t
-    
-
-class Tracker:
-    
-    def __init__(self, enabled=True):
-        self.enabled = enabled
-    
-    @abstractmethod
-    def step(self, obs):
-        pass
-    
-    @abstractmethod
-    def get(self):
-        pass        
-    
-    def episode(self, _):
-        pass #TODO remove in favour of step at interval / episode
-    
-    def summarise(self, summary_writer, label, step):
-        summary_writer.add_scalar(label, self.get(), step)
-
-class EpisodeAverageTracker(Tracker):
-    
-    def __init__(self, size, enabled=False):
-        super(EpisodeAverageTracker, self).__init__(enabled)
-        self.values = collections.deque(maxlen=size)
-        self.current = 0
-        self.step = self.__step_first
-    
-    def __step_first(self, value):
-        self.current += value
-        self.step = self.__step_rest
-        self.enabled = True
-        
-    def __step_rest(self, value):
-        self.current += value
-   
-    def episode(self, _):
-        self.values.append(self.current)
-        self.current = 0
-    
-    def get(self):
-        return sum(self.values) / len(self.values)
-
-class StepTracker(Tracker):
-    
-    def __init__(self, enabled=False):
-        super(StepTracker, self).__init__(enabled)
-        self.value = None
-        self.step = self.__step_first
-     
-    def __step_first(self, value):
-        self.value = value
-        self.step = self.__step_rest
-        self.enabled = True
-        
-    def __step_rest(self, value):
-        self.value = value
-        
-    def episode(self, _):
-        pass
-    
-    def get(self):
-        return self.value
-    
-class StepAverageTracker(Tracker):
-    
-    def __init__(self, size, enabled=False):
-        super(StepAverageTracker, self).__init__(enabled)
-        self.values = collections.deque(maxlen=size)
-        self.step = self.__step_first
-        
-    def episode(self, _):
-        pass #TODO remove 
-    
-    def __step_first(self, value):
-        self.values.append(value)
-        self.step = self.__step_rest
-        self.enabled = True
-        
-    def __step_rest(self, value):
-        self.values.append(value)
-    
-    def get(self):
-        return sum(self.values) / len(self.values)
-    
-    
-class FrameTracker(Tracker):
-    
-    def __init__(self, enabled=True):
-        super(FrameTracker, self).__init__(enabled)
-        self.real_time = datetime.time()
-        self.fps = 0.
-        
-    def step(self, _):
-        pass
-    
-    def episode(self, time):
-        n_real_time = datetime.time()
-        self.fps = time.step / ((n_real_time - self.real_time)) #time is given in seconds?????
-        self.real_time = n_real_time
-        
-    def get(self):
-        return self.fps
-        
-class Info:
-    
-    def __init__(self, summary_writer = None):
-        self.summary_writer = summary_writer
-        self.info_trackers = {}
-        self.print_trackers = []
-        
-    def add_tracker(self, label, tracker, pprint=False, enabled=True):
-        self.info_trackers[label] = tracker
-        if pprint:
-            self.print_trackers.append(label)
-     
-    def episode(self, time):
-        for v in self.info_trackers.values():
-            v.episode(time)
-        
-    def print_info(self, time):
-        print('INFO %s:' %(time))
-        for k in self.print_trackers:
-            print('  %s:%s' %(k,self.info_trackers[k].get()))  
-            
-    def summarise(self, time, trackers=None):
-        if not trackers:
-            for k,v in self.info_trackers.items():
-                v.summarise(self.summary_writer, k, time.global_step)
-        else:
-            for k in trackers:
-                if self.info_trackers[k].enabled:
-                    self.info_trackers[k].summarise(self.summary_writer, k, time.global_step)
                 
 def batch_to_numpy(batch, types, copy=False):
     return [np.array(batch[i], copy=copy, dtype=types[i]) for i in range(len(batch))]

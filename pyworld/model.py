@@ -30,7 +30,26 @@ class Model(ABC):
 class NNModel(Model):
     
     def __init__(self, net, **params):
-        super(NNModel, self).__init__()
+        print("MODEL INFO:")
+        self.device = params.get('device', 'cpu')
+        self.net = net.to(self.device)
+        self.optim = params.get('optim', None)
+        if self.optim is None:
+             self.optim = torch.optim.Adam(net.parameters(), lr=params.get('lr', 0.0001))
+        print("-- USING OPTIMIZER: " + type(self.optim).__name__)
+        print("-- USING NETWORK: " + type(self.net).__name__)
+    
+    def train(self, train=True):
+        if train:
+            self.net.train()
+        else:
+            self.net.eval()
+        
+        
+class DQNNModel(Model):
+    
+    def __init__(self, net, **params):
+        super(DQNNModel, self).__init__()
         print("MODEL INFO:")
         self.device = params.get('device', 'cpu')
         print("-- USING DEVICE: " + self.device)

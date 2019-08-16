@@ -16,18 +16,26 @@ import random
 
 from collections import namedtuple
 
-import torch.nn.functional as F
-
 arsi = namedtuple('observation', ['action', 'reward', 'state', 'info'])
 sarsi = namedtuple('observation', ['pstate', 'action', 'reward', 'state', 'info'])
 rst = namedtuple('observation', ['state', 'info'])
 
 ''' *********************************************** AGENTS *********************************************** '''
+
+def ag_sense_callback(sense, attempt):
+    while True:
+        obs = yield
+        sense(obs)
+        attempt()
+        
 class Agent(ABC):
 
     def __init__(self):
-        pass
-    
+        self._sense_callback = ag_sense_callback(self.sense, self.attempt)
+        self._sense_callback.send(None)
+        self._reset_callback = ag_sense_callback(self.reset, self.attempt)
+        self._reset_callback.send(None)
+
     def add_component(self, label, component):
         setattr(self, label, component)
         
@@ -35,44 +43,57 @@ class Agent(ABC):
         return hasattr(self, label)
     
     @abstractmethod
-    def attempt(self):
+    def attempt(self, *args):
         pass
-
+    
     @abstractmethod
-    def sense(self, obs):
+    def sense(self, *obs):
         pass
+    
+    @abstractmethod
+    def reset(self, *obs):
+        pass
+            
+class SimpleAgent(Agent):
+    
+    def __init__(self, sensor, actuator):
+        super(SimpleAgent, self).__init__()
+        self.sensor = sensor
+        self.sensor.register(self)
+        self.actuator = actuator
+        
+    def attempt(self):
+        self.actuator()
     
     def reset(self, obs):
-        pass
+        print(obs.info.name, obs.info.step)
     
-
-    def __sense__(self):
-        while(True):
-            obs = yield
-            self.sense(obs)
-            self.attempt()
-            
-    def __reset__(self):
-         while(True):
-            obs = yield
-            self.reset(obs)
-            self.attempt()
-
+    def sense(self, obs):
+        print(obs.info.name, obs.info.step)
     
+    
+class GymAgent(Agent):
+    
+    def __init__(self, sensors, actuators):
+        super(GymAgent, self).__init__()
+        for sensor in sensors:
+            sensor.register(self)
+        
+        
+
 ''' *********************************************** SENSORS *********************************************** '''
+
+def sense_callback(sense, callback):
+    while True:
+        obs = yield
+        for ob in sense(obs):
+            callback.send(ob)
 
 class Sensor(ABC):
     
-    def __init__(self, sensor):
-        assert(isinstance(sensor, Sensor) or isinstance(sensor, Agent))
+    def __init__(self, sensor=None):
         self.sensor = sensor
-        self.sense_callback = sensor.__sense__()
-        self.sense_callback.send(None)
-        self.reset_callback = sensor.__reset__()
-        self.reset_callback.send(None)
-        if isinstance(sensor, Sensor):
-            self.observation_space = obs_union(sensor.observation_space, self.observation_space)
-
+        
     @abstractmethod
     def sense(self, obs):
         pass
@@ -80,18 +101,22 @@ class Sensor(ABC):
     @abstractmethod
     def reset(self, obs):
         pass
-        
-    def __sense__(self):
-        while(True):
-            obs = yield
-            for obs in self.sense(obs):
-                self.sense_callback.send(obs)
-                
-    def __reset__(self):
-         while(True):
-            obs = yield
-            for obs in self.reset(obs):
-                self.reset_callback.send(obs)
+    
+    def register(self, agent):
+        if self.sensor is not None:
+            self.sensor.register(agent)
+        else:
+            self.sensor = agent
+        self.__register(self.sensor)
+            
+    def __register(self, sensor):
+        print("REG:", sensor)
+        self._sense_callback = sense_callback(self.sense, sensor._sense_callback)
+        self._sense_callback.send(None)
+        self._reset_callback = sense_callback(self.reset, sensor._reset_callback)
+        self._reset_callback.send(None)
+        if isinstance(sensor, Sensor):
+            self.observation_space = obs_union(sensor.observation_space, self.observation_space)
 
 def obs_union(l1, l2):
     try:
@@ -105,17 +130,14 @@ def obs_union(l1, l2):
         
 class SimpleSensor(Sensor):
     
-    def __init(self, info):
+    def __init(self):
         super(SimpleSensor, self).__init__()
-        self.info = info
         
     def sense(self, obs):
         yield obs
         
     def reset(self, obs):
         yield obs
-
-
    
 '''  
               
@@ -267,14 +289,13 @@ class BatchUnrollSensor(BatchSensor):
             
 class MaxPoolSensor(Sensor):
     
-    def __init__(self, sensor, skip=3):
+    def __init__(self, sensor=None, skip=3):
         self.observation_space = sensor.observation_space
         super(MaxPoolSensor, self).__init__(sensor)
         self.max_pool = collections.deque(maxlen=skip)
         self.skip = skip
         self.total_reward = 0
         self.count = 0
-
         
     def reset(self, obs):
         state, _= obs
@@ -284,23 +305,22 @@ class MaxPoolSensor(Sensor):
         yield obs #max pooling here = state
         
     def sense(self, obs):
-        action, reward, state, time = obs
+        action, reward, state, info = obs
         self.count += 1
         self.max_pool.append(state)
         self.total_reward += reward
-        if self.count % self.skip == 0 or time.done:
+        if self.count % self.skip == 0 or info.done:
             max_frame = np.max(np.stack(self.max_pool), axis=0)
 
-            yield arsi(action, self.total_reward, max_frame, time)
+            yield arsi(action, self.total_reward, max_frame, info)
             self.total_reward = 0
 
 class AtariImageSensor(Sensor):
     
-    def __init__(self, sensor):
+    def __init__(self, sensor=None):
          self.observation_space = [84, 84]
          super(AtariImageSensor, self).__init__(sensor)
 
-    
     def sense(self, obs):
         action, reward, state, time = obs
         tstate = self.transform(state)
@@ -322,6 +342,14 @@ class AtariImageSensor(Sensor):
         img = cv2.resize(img, (84, 110), interpolation=cv2.INTER_AREA)
         return np.reshape(img[18:102, :], [1, 84, 84]).astype(np.float) / 255.0
 
+def sensor(name, *methods):
+    '''
+        Sensor factory
+    '''
+    assert(len(methods) > 1) #sensor must contain atleast the sense method
+    if isinstance(methods[0], tuple):
+        return type(name, (Sensor,), {m.__name__:m for m in methods})
+
 class BufferedSensor1(Sensor):
     
     '''
@@ -340,7 +368,7 @@ class BufferedSensor1(Sensor):
         See also BufferedSensor2
     '''
     
-    def __init__(self, sensor, stack=4):
+    def __init__(self, sensor=None, stack=4):
         self.observation_space = [stack, -1]
         super(BufferedSensor1, self).__init__(sensor)
         self.buffer = collections.deque(maxlen=stack)
@@ -381,14 +409,12 @@ class BufferedSensor2(Sensor):
         
         See also BufferedSensor2
     '''
-    
-    def __init__(self, sensor, stack=4):
+    def __init__(self, sensor=None, stack=4):
         self.observation_space = [stack, -1]
         super(BufferedSensor2, self).__init__(sensor)
         self.buffer = collections.deque(maxlen=stack)
         self.state = None
         self.stack = stack
-        
     
     def reset(self, obs):
         state, time = obs
@@ -408,7 +434,7 @@ class BufferedSensor2(Sensor):
   
 class VisualiseSensor(Sensor):
     
-    def __init__(self, sensor, wait=15, name='state', path=None, step=50, scale=1, split_channels=False):
+    def __init__(self, sensor=None, wait=15, name='state', path=None, step=50, scale=1, split_channels=False):
         self.observation_space = [-1]
         super(VisualiseSensor, self).__init__(sensor)
         self.vis = True
@@ -520,9 +546,6 @@ class ProbabilisticActuator(Actuator):
         action = np.random.choice(len(action_probs), p=action_probs)
         return action
     
-    
-
-        
 class GreedyActuator(Actuator):
     
     def __init_(self):
@@ -547,9 +570,9 @@ class EpsilonGreedyActuator(Actuator):
             action = np.random.choice(len(scores))
         return action
 
-class EpsilonTracker(c.Tracker):
+class EpsilonSchedule():
     def __init__(self, **params):
-        super(EpsilonTracker, self).__init__(enabled=True)
+        super(EpsilonSchedule, self).__init__(enabled=True)
         self.epsilon_start = params.get('epsilon_start', 1.0)
         self.epsilon_final = params.get('epsilon_final', 0.01)
         self.epsilon_frames = params.get('epsilon_frames', 10**5)
@@ -581,22 +604,32 @@ class Experience:
 class BatchExperience(Experience):
     
     def __init__(self, batch_labels = ['action', 'reward', 'state'], batch_size = 16):
-        self.__batch = c.batch(batch_labels)
-        self.buffer = [[] for _ in batch_labels]
+        self.batch_labels = batch_labels
+        self._batch = c.batch(batch_labels)
+        self.buffer = self._batch(*[[] for _ in batch_labels])
         self.batch_size = batch_size
-    
+
     def append(self, *obs):
         for i in range(len(obs)):
             self.buffer[i].append(obs[i])
+            
+    def extend(self, obs):
+        for i in range(len(self.buffer)):
+            self.buffer[i].extend(obs[i])
     
     def full(self):
         return len(self.buffer[0]) > self.batch_size
     
     def pop(self):
         popped = [x[:self.batch_size] for x in self.buffer]
-        for e in self.buffer:
-            e = e[self.batch_size:]
-        return self.__batch(*popped)
+        for i in range(len(self.buffer)):
+            self.buffer[i] = self.buffer[i][self.batch_size:]
+        return self._batch(*popped)
+    
+    def popall(self):
+        pop = self._batch(*self.buffer)
+        self.buffer = self._batch(*[[] for _ in self.batch_labels])
+        return pop
         
     def clear(self):
         for s in self.buffer:
@@ -608,79 +641,93 @@ class BatchExperience(Experience):
     def batch_to_tensor(self, batch, types, device='cpu'):
         return [types[i](batch[i]).to(device) for i in range(len(batch))]
     
+
 class UnrollExperience(BatchExperience):
+    BATCH_LABELS = ['state', 'action', 'reward']
     
-    def __init__(self, gamma = 0.99, batch_labels = ['pstate', 'action', 'reward', 'state', 'dones'], batch_size=16, steps=3):
+    def __init__(self, batch_update, batch_labels = BATCH_LABELS, gamma=0.99, batch_size=16, steps=-1):
         super(UnrollExperience, self).__init__(batch_labels=batch_labels, batch_size=batch_size)
-        self.acc = UnrollExperience.UnrollAcc(steps)
-        self.gamma = gamma
-    
-    def __exp(self, *obs):
-        super(UnrollExperience, self).append(*obs)
-        
-    def reset(self, *obs):
-        self.acc.reset(obs)
-        
-    def append(self, *obs):
-        self.acc.update(obs, self.gamma, self.__exp)
-   
-    class UnrollAcc:
-        
-        def __init__(self, steps=3):
-            self.steps = steps
-            self.state = None
-            self.unroll_states = collections.deque(maxlen=self.steps)
-            self.unroll_actions = collections.deque(maxlen=self.steps)
-            self.unroll_rewards = collections.deque(maxlen=self.steps)
-            self.update = self.__init_update
-            
-        def reset(self, obs):
-            self.update = self.__init_update
-            self.state, _ = obs
-            
-        def __init_update(self, obs, gamma, _):
-            action, reward, state, time = obs
-
-            self.unroll_actions.append(action)
-            self.unroll_rewards.append(0)
-            self.unroll_states.append(self.state)
-            
-            gg = 1
-            for i in range(len(self.unroll_rewards)-1, -1, -1):
-                self.unroll_rewards[i] += (gg * reward)
-                gg *= gamma
-            
-            #print('s', self.unroll_states)
-            #print('r', self.unroll_rewards)
+        empty_batch = lambda: self._batch(*[[] for _ in batch_labels])
+        if steps > 0:
+            self.acc = UnrollExperience.UnrollAccStep(gamma, empty_batch, batch_update, steps)
+        else:
+            self.acc = UnrollExperience.UnrollAccEpisode(gamma, empty_batch, batch_update)
                 
-            self.state = state
+    def append(self, *obs):
+
+        self.acc.update(*obs, self.__exp)
+        
+    def __exp(self, obs):
+        super(UnrollExperience, self).extend(obs)
             
-            if(len(self.unroll_states) == self.steps):
+    class UnrollAccEpisode:
+        
+        def __init__(self, gamma, empty_batch, batch_update):
+            self.observations = empty_batch()
+            self.gamma = gamma
+            self.empty_batch = empty_batch
+            self.batch_update = batch_update
+
+        
+        def update(self, obs, exp):
+            #assert(self.observations._fields == obs._fields) #disable optimisation!
+            self.batch_update(self.observations, obs)
+            if obs.info.done:
+                #compute discounted reward
+                rewards = self.observations.reward
+                dr = 0
+                for i in range(len(rewards)-1, -1, -1):
+                    rewards[i] = rewards[i] + self.gamma * dr
+                    dr = rewards[i]
+                exp(self.observations)
+                #reset observations
+                self.observations = self.empty_batch()
+                
+    class UnrollAccStep:
+        
+        def __init__(self, gamma, empty_batch, batch_update, steps=2):
+            empty = empty_batch()
+            self.steps = steps + 1
+            self.observations = empty_batch(*[collections.deque(maxlen=self.steps) for i in range(len(empty))])
+            self.gamma = gamma
+            self.empty_batch = empty_batch
+            self.update = self.__init_update
+            self.batch_update = batch_update
+            
+        def __init_update(self, obs, exp):
+            #assert(self.observations._fields == obs._fields) #disable optimisation!
+            self.batch_update(self.observations, obs)
+            
+            #be careful not to have a large step, this could cause problems with repreated multiplication..
+            gg = self.gamma
+            for i in range(len(self.observations.reward)-2, -1, -1):
+                self.observations.reward[i] += (gg * obs.reward)
+                gg *= self.gamma
+                
+            if(len(self.observations.reward) == self.steps):
                 self.update = self.__update
+                exp(self.empty_batch(*[[o.popleft()] for o in self.observations])) #never done here
+                
             
             
-        def __update(self, obs, gamma, exp):
-            assert(len(self.unroll_states) == self.steps) #...you should be calling reset!
-            action, reward, state, time = obs
+        def __update(self, obs, exp):
+            #assert(self.observations._fields == obs._fields) #disable optimisation!
+            self.batch_update(self.observations, obs)
 
-            exp(self.unroll_states.popleft(), self.unroll_actions.popleft(), self.unroll_rewards.popleft(), self.state, 0) #never done here
-
-            self.unroll_actions.append(action)
-            self.unroll_rewards.append(0)
-            self.unroll_states.append(self.state)
-
-            gg = 1
-            for i in range(len(self.unroll_rewards)-1, -1, -1):
-                self.unroll_rewards[i] += (gg * reward)
-                gg *= gamma
+            gg = 1 * self.gamma
+            for i in range(len(self.observations.reward)-2, -1, -1):
+                self.observations.reward[i] += (gg * obs.reward)
+                gg *= self.gamma
+            print("u", self.observations)
+            exp(self.empty_batch(*[[o.popleft()] for o in self.observations])) #never done here
+            print("u", self.observations)
             
-            #print('s', self.unroll_states)
-            #print('r', self.unroll_rewards)
-            if time.done:
+            if obs.info.done:
                 for i in range(len(self.unroll_states)):
-                    exp(self.unroll_states.popleft(), self.unroll_actions.popleft(), self.unroll_rewards.popleft(), state, time.done)
-                    
-            self.state = state
+                    exp(self.empty_batch(*[[o.popleft()] for o in self.observations]))
+                self.update = self.__init_update
+
+   
           
 class ExperienceReplay(Experience):
     
@@ -731,4 +778,55 @@ class PrioritisedExperienceReplay(ExperienceReplay):
 
 
 
+if __name__ == "__main__":
+    
 
+    from simulate import Meta as meta
+    
+    def batch_update(batch, obs):
+        batch.reward.append(obs.reward)
+        batch.step.append(obs.info.step)
+    
+    def testEpisodeUnrollExperience():
+        ob = collections.namedtuple('observation', 'reward info')
+        exp = UnrollExperience(batch_update, batch_labels=['reward', 'info'], )
+        info = meta(0)
+        exp.append(ob(1,info))
+        info.done = True
+        exp.append(ob(1,info))
+        reward,info = exp.pop()
+        print(info)
+        print(reward)
+        
+    def testStepUnrollExperience():
+        ob = collections.namedtuple('observation', 'reward info')
+        exp = UnrollExperience(batch_update, batch_labels=['reward', 'step'], steps=2)
+        info = meta(0)
+        exp.append(ob(1,info))
+        info.step += 1
+        exp.append(ob(1,info))
+        info.step += 1
+        exp.append(ob(1,info))
+        info.step += 1
+        exp.append(ob(1,info))
+        
+
+        print(exp.pop())
+        print(exp.pop())
+        
+    testStepUnrollExperience()
+    #testEpisodeUnrollExperience()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

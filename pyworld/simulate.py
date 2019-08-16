@@ -7,6 +7,7 @@ Created on Wed Apr 17 17:25:51 2019
 """
 
 import gym
+import math
 from abc import ABC, abstractmethod
 
 import torch.multiprocessing as mp #used for multi-environment parallelism
@@ -14,15 +15,15 @@ import collections
 
 class Meta:
     
-    def __init__(self, env=0):
+    def __init__(self, name=0):
         self.episode = 0
         self.step = 0
         self.global_step = 0
         self.done = 0
-        self.environment = env
+        self.name = name
         
     def __str__(self):
-        s = 'time(env: {4}, episode: {0}, step: {1}, global: {2}, done: {3})'.format(self.episode, self.step, self.global_step, self.done, self.environment)
+        s = 'info(name: {4}, episode: {0}, step: {1}, global: {2}, done: {3})'.format(self.episode, self.step, self.global_step, self.done, self.name)
         return s
     
     def __repr__(self):
@@ -41,9 +42,8 @@ class Simulator(ABC):
         self.running = False
         
     @abstractmethod
-    def __iter__(self):
+    def __call__(self):
         pass
-
 
 def environment(env):
     if isinstance(env, str):
@@ -51,156 +51,133 @@ def environment(env):
     assert isinstance(env, gym.Env)
     return env
 
+def iterable(obj):
+    try:
+        iter(obj)
+    except TypeError:
+        obj = [obj]
+    return obj
+
+def chunk(arg, n):
+    for i in range(0,len(arg), n):
+        yield arg[i:i + n]
+
 class GymSimulator(Simulator):
     
-    obs = collections.namedtuple('observation', ['action', 'reward', 'state', 'info'])
-    obs_reset = collections.namedtuple('observation', ['state', 'info'])
+    obs_tuple = collections.namedtuple('observation', ['action', 'reward', 'state', 'info'])
+    obs_reset_tuple = collections.namedtuple('observation', ['state', 'info'])
+    callbacks_tuple = collections.namedtuple('callbacks', ['sense', 'reset', 'act'])
+    env_tuple = collections.namedtuple('environment', ['env', 'meta', 'callbacks'])
     
-    def __init__(self, envs, proc_count=12):
+    def __init__(self, envs):
         super(GymSimulator, self).__init__()
-        self.envs = {}
-        self.meta = {}
+        self.envs = []
+        self._init_envs = iterable(envs)
 
-        if isinstance(envs, str):
-            self.envs[0] = environment(envs)
-            self.meta[0] = Meta(0)
-        elif isinstance(envs, gym.Env):
-            self.envs[0] = envs
-            self.meta[0] = Meta(0)
-        else:
-            for i in range(len(envs)):
-                env = environment(envs[i])
-                self.envs[i] = env
-                self.meta[i] = Meta(i)
-    
+        
     def stop(self):
         self.running = False
-        for _,env in self.envs.items():
-            env.close()
+        for env in self.envs:
+            env.env.close()
     
     def add_agent(self, agent):
         assert len(self.agents) <= 1, 'An OpenAi-gym simulator only permits single agent environments.'
         super(GymSimulator, self).add_agent(agent)
     
-    def __iter__(self):
+    def __call__(self, procs=None):
         self.running = True
-        sense_call = self.agents[0].sensor.__sense__()
-        sense_call.send(None)
-        reset_call = self.agents[0].sensor.__reset__()
-        reset_call.send(None)
-        act_call = self.agents[0].actuator.__act__()
+        if procs is not None:
+            split = max(1, math.ceil(len(self._init_envs)/ procs))
+            env_procs = [l for l in chunk(self._init_envs, split)]
+            self.__init_and_run_envs_mp(env_procs)
+        else:
+            for meta in self.__init_and_run_envs(self._init_envs):
+                yield meta
+
+            
+    def __init_envs(self, init_envs, agent):
+        envs = []
+        for i in range(len(init_envs)):
+            env = environment(init_envs[i])
+            env = GymSimulator.env_tuple(env, Meta(i), GymSimulator.callbacks_tuple([], [], []))
+            #mp will take deep copies of sensors and actuators automatically.
+            env.callbacks.sense.append(agent.sensor._sense_callback)
+            env.callbacks.reset.append(agent.sensor._reset_callback)
+            env.callbacks.act.append(agent.actuator.__act__())
+            envs.append(env)
+        return envs
         
-        reset = [reset_call]
-        sense = [sense_call]
-        act = [act_call]
+    def __init_and_run_envs_mp(self, envs_procs):
+        processes = []
         
-        #round robin switching between environments, this could be parallelised
-        
-        actions = [None] * len(self.envs)
+        for envs in envs_procs:
+            p = mp.Process(target=self.__init_and_run_envs, args=(envs,)) #TODO
+            p.start()
+            processes.append(p)
+        for p in processes:
+            p.join()   
+
+    def __init_and_run_envs(self, envs):
+        #initialise all environments to run, Gym environments only support 1 agent
+        print(self, "running environments: ", envs)
+        self.envs = envs = self.__init_envs(envs, self.agents[0])
+        #round robin switching between environments
+        actions = [0] * len(envs)
         # get initial states for each env
-        for k,env in self.envs.items():
-            state = self.__reset__env__(k, reset)
-            yield None, None, state, self.meta[k]
-            actions[k] = next(act[0])
-        
+        for i in range(len(envs)):
+            env = envs[i]
+            state = self.__reset_env(env)
+            #yield None, None, state, env.meta
+            for acts in env.callbacks.act:
+                #this should only loop once for a gym environment
+                actions[i] = next(acts) 
+        yield [env.meta for env in envs]
         while(self.running):
-            for k, env in self.envs.items():
-                action = actions[k]
-                state, reward, self.meta[k].done, _ = env.step(action)
-                self.meta[k].step += 1
-                self.meta[k].global_step += 1
-                
-                for s in sense:
-                    s.send(GymSimulator.obs(action, reward, state, self.meta[k]))
-                
-                yield action, reward, state, self.meta[k]
-                
-                if self.meta[k].done:
-                   state = self.__reset__env__(k, reset)
-                   yield None, None, state, self.meta[k]
-                actions[k] = next(act[0])
+            for i in range(len(envs)):
+                env = envs[i]
+                state, reward, env.meta.done, _ = env.env.step(actions[i])
+                env.meta.step += 1
+                env.meta.global_step += 1
+                for s in env.callbacks.sense:
+                    s.send(GymSimulator.obs_tuple(actions[i], reward, state, env.meta))
+
+                if env.meta.done:
+                   state = self.__reset_env(env)
+
+                for acts in env.callbacks.act:
+                    #this should only loop once for a gym environment
+                    actions[i] = next(acts) 
+            yield [env.meta for env in envs]
                
-    def __reset__env__(self, k, resets):
-        self.meta[k].episode += 1
-        self.meta[k].step = 0
-        self.meta[k].done = False
-        state = self.envs[k].reset()
-        for r in resets:
-            r.send(GymSimulator.obs_reset(state, self.meta[k]))
+    def __reset_env(self, env):
+        env.meta.episode += 1
+        env.meta.step = 0
+        env.meta.done = False
+        state = env.env.reset()
+        for s in env.callbacks.reset:
+            s.send(GymSimulator.obs_reset_tuple(state, env.meta))
         return state
 
 
-
-
-
-
-
-
-
-'''   
-class GymSimulator(Simulator):
+if __name__ == "__main__":
+     
+    import toolkit.tools.gymutils as gu
+    import agent as pwag
+   
+    env_name = "Pong-v0"
+    env = gym.make(env_name)
     
-    def __init__(self, env, debug=None, render=False):
-        super(GymSimulator, self).__init__()
-        assert isinstance(env, gym.Env) or isinstance(env, str)
-        
-        if isinstance(env, gym.Env):
-            self.env = env
-        else:
-            self.env = gym.make(env)
+    #env3 = gym.make("Pong-v0")
 
-        self.time = Time()
-        self.render = render
-        self.debug = debug
+    policy = gu.uniform_random_policy(env)
+    sensor = pwag.MaxPoolSensor(pwag.AtariImageSensor())
+    actuator = pwag.RandomActuator(env.action_space)
+    ag = pwag.SimpleAgent(sensor, actuator)
     
-    def stop(self):
-        self.running = False
-        self.env.close()
+    sim = GymSimulator([env_name,env_name])#, env2, env3])
+    sim.add_agent(ag)
     
-    def add_agent(self, agent):
-        assert len(self.agents) <= 1, 'An OpenAi-gym simulator only permits single agent environments.'
-        super(GymSimulator, self).add_agent(agent)
-        
-    def __iter__(self):
-        self.running = True
-        sense_call = self.agents[0].sensor.__sense__()
-        sense_call.send(None)
-        reset_call = self.agents[0].sensor.__reset__()
-        reset_call.send(None)
-        act_call = self.agents[0].actuator.__act__()
-        
-        reset = [reset_call]
-        sense = [sense_call]
-        act = [act_call]
-        
-        state = self.__reset__env__(reset)
-
-        yield None, None, state, self.time
-        while(self.running):
-            action = next(act[0]) #combine all actions from all agents into 1?7
-            state, reward, self.time.done, _ = self.env.step(action)
-            if self.render:
-                self.env.render()
-            self.time.step += 1
-            self.time.global_step += 1
-            
-            for s in sense:
-                s.send((action, reward, state, self.time))
-            
-            yield action, reward, state, self.time
-            
-            if self.time.done:
-               state = self.__reset__env__(reset)
-               yield action, reward, state, self.time
-               
-    def __reset__env__(self, resets):
-        self.time.episode += 1
-        self.time.step = 0
-        self.time.done = False
-        state = self.env.reset()
-        if self.render:
-            self.env.render()
-        for r in resets:
-            r.send((state, self.time))
-        return state
-'''
+    sim(procs=2)
+    
+    
+    

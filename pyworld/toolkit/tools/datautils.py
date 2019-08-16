@@ -7,32 +7,51 @@ Created on Mon May 20 16:53:40 2019
 """
 import numpy as np
 
-def batch_to_numpy(batch, types, copy=False):
-    return [np.array(batch[i], copy=copy, dtype=types[i]) for i in range(len(batch))]
-
-def batch_to_tensor(batch, types, device='cpu'):
-        return [types[i](batch[i]).to(device) for i in range(len(batch))]
-    
-def batch_iterator(*data, batch_size=16, shuffle=False):
-    if shuffle:
-        for d in data:   
-            np.random.shuffle(d)
+def display_increments2(total):
     j = 0
-    m = max(len(d) for d in data)
-    for i in range(batch_size, m, batch_size):
-        yield [d[j:i] for d in data]
-        j = i
-    yield [d[j:] for d in data]
+    i = 0
+    while j < total:
+        j = i**2
+        yield j
+        i += 1        
 
+def onehot(y):
+    y = y.squeeze()
+    r = np.zeros((y.shape[0], len(np.unique(y))))
+    r[np.arange(0,y.shape[0]), y] = 1.
+    return r
+    
+
+def mnist(normalise=True):
+    import tensorflow as tf
+    mnist = tf.keras.datasets.mnist
+    
+    (x_train, y_train), (x_test, y_test) = mnist.load_data()
+    x_train = np.expand_dims(x_train, 1)
+    y_train = np.expand_dims(y_train, 1) 
+    x_test = np.expand_dims(x_test, 1) 
+    y_test = np.expand_dims(y_test, 1)
+    if normalise:
+        return x_train / 255.0, y_train, x_test / 255.0, y_test
+    else:
+        return x_train, y_train, x_test, y_test
+
+def flatten(x):
+    """
+        flatttens each example in batch: (n, d1, d2, ...) -> (n, d1 x d2 x ...)
+    """
+    return x.reshape(-1, np.prod(x.shape[1:]))
+        
 class MeanAccumulator:
     
-    def __init__(self):
+    def __init__(self, n=float('inf')):
         self._m = 0
         self._n = 0
+        self._max_n = n
         
     def push(self, x):
         self._n += 1
-        self._m = MeanAccumulator._moving_mean(self._m, x, self._n)
+        self._m = MeanAccumulator._moving_mean(self._m, x, min(self._n, self._max_n))
         
     def mean(self):
         assert(self._n > 0) # mean of no samples is undefined
@@ -47,6 +66,16 @@ class MeanAccumulator:
                 n: number of values so far (including x)
         '''
         return (x + (n-1) * mean) / n
+    
+    def reset(self):
+        self._m = 0
+        self._n = 0
+    
+    def __str__(self):
+        return str(self.mean())
+    
+    def __repr__(self):
+        return MeanAccumulator.__name__ + '-' + str(self._m)
 
 class MeanAccumulator2:
     
@@ -146,71 +175,124 @@ class VarianceAccumulator2:
         M[:lx], S[:lx] = VarianceAccumulator._moving_variance(M[:lx], S[:lx], x[:lm], n[:min(lx,lm)])
         return np.concatenate((M, x[lm:])), np.concatenate((S, np.zeros(len(x[lm:])))), n, len(M)
         
-   
-  
-if __name__ == "__main__":
     
-    ma = MeanAccumulator()
-    x1 = 0
-    ma.push(x1)
-    print(ma.mean())
-    x2 = 1
-    ma.push(x2)
-    print(ma.mean())
-    x3 = 0
-    ma.push(x3)
-    print(ma.mean())
     
-    ma = MeanAccumulator()
-    x1 = np.array([0,0])
-    ma.push(x1)
-    print(ma.mean())
-    x2 = np.array([1,1])
-    ma.push(x2)
-    print(ma.mean())
-    x3 = np.array([1,0])
-    ma.push(x3)
-    print(ma.mean())
+class CMA:
+    
+    def __init__(self, *labels):
+        self.labels = labels
+        self.reset()
+    
+    def push(self, x):
+        self._n += 1
+        self._m = (x + (self._n-1) * self._m) / self._n
+        
+    def __call__(self):
+        assert(self._n > 0) # mean of no samples is undefined
+        return self._m
+    
+    def reset(self):
+        if len(self.labels) > 0:
+            self._m = np.zeros(len(self.labels))
+        else:
+            self._m = 0
+        self._n = 0
+        
+    def labelled(self):
+        return {self.labels[i]:self._m[i] for i in range(len(self.labels))}
+    
+    def __str__(self):
+        if len(self.labels) > 0:
+            return str(self.labelled())
+        else:        
+            return str(self._m)
+    
+    def __repr__(self):
+        return CMA.__name__ + '-' + str(self)
+    
+class EMA:
+    
+    def __init__(self, n):
+        self._alpha = 2. / (n + 1.)
+        self.reset()
+        
+    def __push1(self, x):
+        self._m = x
+        self.push = self.__push
 
-    print("MA2")
-    ma = MeanAccumulator2()
-    x1 = np.array([0,0,1])
-    ma.push(x1)
-    print(ma.mean())
-    x2 = np.array([1])
-    ma.push(x2)
-    print(ma.mean())
-    x3 = np.array([1,1])
-    ma.push(x3)
-    print(ma.mean())
+    def __push(self, x):
+        self._m = self._alpha * x + (1-self._alpha) * self._m
     
-    print("VA2")
-    va = VarianceAccumulator2()
-    x1 = np.array([0.])
-    x2 = np.array([0.,1.])
-    x3 = np.array([1.,1.,2.])
-    x4 = np.array([1.])
+    def __call__(self):
+        assert(self._m is not None) # mean of no samples is undefined
+        return self._m
     
-    va.push(x1)
-    print(va.variance(), va.mean())
-    va.push(x2)
-    print(va.variance(), va.mean())
-    va.push(x3)
-    print(va.variance(), va.mean())
-    va.push(x4)
-    print(va.variance(), va.mean())
+    def reset(self):
+        self._m = 0
+        self.push = self.__push1
     
-    print("VA")
-    va = VarianceAccumulator()
-    x1 = 1
-    va.push(x1)
-    print(va.mean())
-    x2 = 1
-    va.push(x2)
-    print(va.variance(), va.mean())
-    x3 = 0
-    va.push(x3)
-    print(va.variance(), va.mean())
+    def __str__(self):
+        return str(self._m)
+    
+    def __repr__(self):
+        return EMA.__name__ + '-' + str(self._m)
+
+def apply(iterator, fun):
+    for i in iterator:
+        yield fun(i)
+ 
+def batch_iterator(*data, batch_size=16, shuffle=False):
+    if shuffle:
+        for d in data:   
+            np.random.shuffle(d)
+    j = 0
+    m = max(len(d) for d in data)
+    for i in range(batch_size, m, batch_size):
+        yield (*[d[j:i] for d in data], i)
+        j = i
+    yield (*[d[j:] for d in data], m)
+    
+def batch_iterator2(iterator, batch_size, limit=np.inf, btype=list):
+    limit = limit * batch_size
+    i = 0 
+    batch = []
+    for b in iterator:
+        i += 1
+        batch.append(b)
+        if i >= limit:
+            break
+        if not i % batch_size:
+            if len(batch) > 0:
+                yield (btype(batch), i)
+            batch = []
+    if len(batch) > 0:
+        yield (btype(batch) , i)
+
+def batch_iterator3(*data, batch_size=16 , p=None, iterations=None):
+    assert p is None #not implemented yet
+    m = max(len(d) for d in data)
+    if iterations is None:
+        iterations = int(m/batch_size)
+    for i in range(iterations):
+        indx = np.random.randint(0,m,batch_size)
+        yield (*[d[indx] for d in data], i)
+
+def normalise(data):
+    maxd = np.max(data)
+    mind = np.min(data)
+    return (data - mind) / (maxd - mind)
+
+
+if __name__ == "__main__":
+    data = np.arange(0,1000)
+    for (d, i) in batch_iterator3(data):
+        print(d)
+        
+   
+    
+
+    
+
     
     
 

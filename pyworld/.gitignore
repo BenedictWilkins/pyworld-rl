@@ -1,0 +1,4 @@
+*.pyc
+*.pyo
+algorithms/MNIST_DATA/
+toolkit/tools/runs/

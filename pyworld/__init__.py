@@ -11,5 +11,8 @@ from . import agent
 from . import simulate
 from . import params
 from . import model
+from .algorithms.policygradient import PolicyGradient
+from . import algorithms
+from . import toolkit
 
-__all__ = ('common', 'agent', 'simulate', 'params', 'model')
+__all__ = ('common', 'agent', 'simulate', 'params', 'model', 'PolicyGradient', 'toolkit', 'algorithms')

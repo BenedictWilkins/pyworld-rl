@@ -7,15 +7,17 @@ Created on Fri May 17 14:57:17 2019
 """
 import gym 
 import numpy as np
+import cv2
 
 from collections import namedtuple
 
+tuple_s = namedtuple('observation', ['state'])
 tuple_r = namedtuple('observation', ['reward'])
+tuple_sa = namedtuple('observation', ['state', 'action'])
 tuple_sr = namedtuple('observation', ['state', 'reward'])
 tuple_sar = namedtuple('observation', ['state', 'action', 'reward'])
 tuple_ars = namedtuple('observation', ['action', 'reward', 'nstate'])
 tuple_sars = namedtuple('observation', ['state', 'action', 'reward', 'nstate'])
-
 
 class ResetEnvWrapper(gym.Wrapper):
     
@@ -32,7 +34,16 @@ class ResetEnvWrapper(gym.Wrapper):
         return self.env.unwrapped._get_obs()
     
 def uniform_random_policy(env):
-    return lambda _: np.random.randint(0, env.action_space.n)
+    return lambda _: env.action_space.sample()
+
+def s_iterator(env, policy):
+    state = env.reset()
+    yield tuple_s(state)
+    done = False
+    while not done:
+        action = policy(state)
+        state, _, done, _ = env.step(action)
+        yield tuple_s(state)
     
 def r_iterator(env, policy):
     state = env.reset()
@@ -41,6 +52,15 @@ def r_iterator(env, policy):
         action = policy(state)
         state, reward, done, _ = env.step(action)
         yield tuple_r(reward)
+        
+def sa_iterator(env, policy):
+    state = env.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, _, done, _ = env.step(action)
+        yield tuple_sa(state, action)
+        state = nstate
         
 def sr_iterator(env, policy):
     state = env.reset()
@@ -105,7 +125,38 @@ def sdr_episode_iterator(env, policy, gamma=0.99, iterator=sr_iterator):
             rewards[i] = rewards[i] + gamma * dr
             dr = rewards[i]
         yield obs
+
+
+    
+class ObservationWrapper(gym.ObservationWrapper):
+      
+    GRAY_SCALE_CROP = lambda _: ((1,84,84), ObservationWrapper.__gray_scale_crop)
+    GRAY = lambda env: ((1, *env.observation_space.shape[:2]), ObservationWrapper.__gray)
+    IDENTITY = lambda env: ((env.observation_space.shape[2], *env.observation_space.shape[:2]), ObservationWrapper.__identity)
+    
+    def __init__(self, env, processor):
+        super(ObservationWrapper, self).__init__(env)
+        self.shape, self.__c = processor(env)
+        self.observation_space = gym.spaces.Box(low=0., high=1., shape=self.shape) 
+    
+    def observation(self, obs):
+        return self.__c(obs, self.shape)
+
+    def __identity(state, shape):
+        return np.reshape(state, shape).astype(np.float) / 255.0
         
+    def __gray(state, shape):
+        img = (state[:, :, 0] * 0.299 + state[:, :, 1] * 0.587 + state[:, :, 2] * 0.114).astype(np.float)
+        return np.reshape(img, shape).astype(np.float) / 255.0
+        
+    def __gray_scale_crop(state, shape):
+        img = (state[:, :, 0] * 0.299 + state[:, :, 1] * 0.587 + state[:, :, 2] * 0.114).astype(np.float)
+        img = cv2.resize(img, (84, 110), interpolation=cv2.INTER_AREA)
+        return np.reshape(img[18:102, :], shape).astype(np.float) / 255.0
+    
+    def __binarise(state, threshold=0.5):
+        return np.where(state>threshold, 1., 0.)
+    
 '''
 def dataset(iterator, file, n=1000):
     data = []
