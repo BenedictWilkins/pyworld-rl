@@ -3,7 +3,7 @@
 """
 Created on Mon May 20 16:53:40 2019
 
-@author: ben
+@author: Benedict Wilkins
 """
 import numpy as np
 
@@ -18,10 +18,14 @@ def display_increments2(total):
 def onehot(y):
     y = y.squeeze()
     r = np.zeros((y.shape[0], len(np.unique(y))))
-    r[np.arange(0,y.shape[0]), y] = 1.
+    r[:, y] = 1.
+    return r
+
+def onehot_int(y, size):
+    r = np.zeros((size))
+    r[y] = 1
     return r
     
-
 def mnist(normalise=True):
     import tensorflow as tf
     mnist = tf.keras.datasets.mnist
@@ -36,12 +40,20 @@ def mnist(normalise=True):
     else:
         return x_train, y_train, x_test, y_test
 
-def flatten(x):
-    """
-        flatttens each example in batch: (n, d1, d2, ...) -> (n, d1 x d2 x ...)
-    """
-    return x.reshape(-1, np.prod(x.shape[1:]))
-        
+def splitbylabel(x, y):
+    result = {}
+    for label in np.unique(y):
+        result[label] = x[(y==label).squeeze()]
+    return result
+
+def collect(model, x):
+    j = 0
+    result = np.empty((x.shape[0], 2))
+    for x_batch, i in batch_iterator(x):
+        result[j:i] = model(x_batch)
+        j = i
+    return result
+    
 class MeanAccumulator:
     
     def __init__(self, n=float('inf')):
@@ -242,11 +254,12 @@ def apply(iterator, fun):
         yield fun(i)
  
 def batch_iterator(*data, batch_size=16, shuffle=False):
-    if shuffle:
-        for d in data:   
-            np.random.shuffle(d)
-    j = 0
     m = max(len(d) for d in data)
+    if shuffle:
+        indx = np.arange(m)
+        np.random.shuffle(indx)
+        data = [d[indx] for d in data]
+    j = 0
     for i in range(batch_size, m, batch_size):
         yield (*[d[j:i] for d in data], i)
         j = i
@@ -282,11 +295,21 @@ def normalise(data):
     mind = np.min(data)
     return (data - mind) / (maxd - mind)
 
+def group_avg(x,y):
+    unique = np.unique(x, axis=0)
+
+    avg = np.empty(unique.shape[0])
+    for i, u in enumerate(unique):
+        avg[i] = y[(x==u).all(1)].mean()
+    return unique, avg
 
 if __name__ == "__main__":
-    data = np.arange(0,1000)
-    for (d, i) in batch_iterator3(data):
-        print(d)
+    x = np.arange(64)
+    y = np.arange(64)
+    for x_, y_, i in batch_iterator(x,y, shuffle=True):
+        print(x_)
+        print(y_)
+        print()
         
    
     

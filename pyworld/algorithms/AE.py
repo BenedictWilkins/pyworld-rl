@@ -40,11 +40,13 @@ class AE(nn.Module):
     def reconstruct(self, x):
         return self.apply(x, lambda x : self(x)[0].detach().cpu().numpy(), x.shape)
        
-    def apply(self, x, fun, shape, batch_size=64):
+    def apply(self, fun, shape, *x, batch_size=64):
+        #TODO remeber x arg position was changed
         x_ = np.empty(shape)
         j = 0
-        for x_batch, i in du.batch_iterator(x, batch_size=batch_size, shuffle=False):
-            x_[j:i] = fun(x_batch)
+        for r in du.batch_iterator(*x, batch_size=batch_size, shuffle=False):
+            i = r[-1]
+            x_[j:i] = fun(*r[:-1])
             j = i
         return x_
 
@@ -208,13 +210,16 @@ def label_colours(labels, alpha=0.8):
     return result
     
     
-def plot_latent2D(ae, x, y=None, fun=None, marker=".", fig=None, alpha=0.8, 
+def plot_latent2D(ae, x, y=None, fun=None, marker=".", fig=None, clf=True, alpha=0.8, 
                   title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001):
+    
     
     if fig is None:
         fig = plt.figure()
-    else:
+    if clf:
         fig.clf()
+        
+        
     if fun is None:
         fun = ae.encode
     if xlim is not None:

@@ -7,6 +7,7 @@ Created on Fri Jun 14 11:41:32 2019
 """
 import cv2
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import numpy as np
 
 from . import fileutils as fu
@@ -52,6 +53,18 @@ def channels_to_cv(data):
         return data.reshape((data.shape[0], data.shape[2], data.shape[3], data.shape[1]))
     elif len(data.shape) == 3:
         return data.reshape((data.shape[1], data.shape[2], data.shape[0]))
+    
+def shape_to_torch(shape):
+    if len(shape) == 4:
+        return (shape[0], shape[3], shape[1], shape[2])
+    elif len(shape) == 3:
+        return (shape[2], shape[0], shape[1])
+
+def shape_to_cv(shape):
+    if len(shape) == 4:
+        return (shape[0], shape[2], shape[3], shape[1])
+    elif len(shape) == 3:
+        return (shape[1], shape[2], shape[0])
 
 '''
 def gallery(array, ncols=3):
@@ -64,6 +77,51 @@ def gallery(array, ncols=3):
               .reshape(height*nrows, width*ncols))
     return result
 '''
+def label_colours(labels, alpha=0.8):
+    colours = cm.rainbow(np.linspace(0,1,len(labels)))
+    colours[:,3] *= alpha
+    result = {}
+    for i in range(colours.shape[0]):
+        result[labels[i]] = colours[i]
+    return result
+    
+
+def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8, 
+                  title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001):
+    if fig is None:
+        fig = plt.figure()
+    if clf:
+        fig.clf()
+
+    
+    z = du.collect(model, x)
+    assert z.shape[1] == 2
+    line_handles = []
+    label_handles = []
+    if y is None:
+        y = np.ones(x.shape[0])
+
+    data = du.splitbylabel(z, y)
+    colours = label_colours(list(data.keys()), alpha)
+    
+    for label,d in data.items():
+        line = plt.scatter(d[:,0], d[:,1], color=colours[label],  edgecolors='none', label=label, marker=marker)
+        line_handles.append(line)
+        label_handles.append(label)
+       
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
+        
+    plt.legend(line_handles, label_handles, loc="upper right")
+    plt.suptitle(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.draw()
+    plt.pause(pause)
+    return fig
+
 #123, 252, 3
 def show_attention(values, queries, weights, embed_size=None, display_shape=(240,480),
                    wait=240, line_colour=(0.48235, 0.98823, 0.01176), line_tickness=2):
@@ -164,19 +222,3 @@ def waitclose(wait=60):
         close()
         return True
     return False
-
-        
-if __name__ == '__main__':
-    
-    import gymutils as gu
-    import gym
-    
-    env = gym.make('SpaceInvaders-v0')
-    policy = gu.uniform_random_policy(env)
-    
-    def video(env, policy):
-        for s in gu.s_iterator(env, policy):
-            yield s.state
-            
-    play(video(env, policy))
-        

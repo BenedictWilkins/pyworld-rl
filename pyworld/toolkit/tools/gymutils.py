@@ -10,6 +10,7 @@ import numpy as np
 import cv2
 
 from collections import namedtuple
+from . import datautils as du
 
 tuple_s = namedtuple('observation', ['state'])
 tuple_r = namedtuple('observation', ['reward'])
@@ -17,6 +18,7 @@ tuple_sa = namedtuple('observation', ['state', 'action'])
 tuple_sr = namedtuple('observation', ['state', 'reward'])
 tuple_sar = namedtuple('observation', ['state', 'action', 'reward'])
 tuple_ars = namedtuple('observation', ['action', 'reward', 'nstate'])
+tuple_sas = namedtuple('observation', ['state', 'action', 'nstate'])
 tuple_sars = namedtuple('observation', ['state', 'action', 'reward', 'nstate'])
 
 class ResetEnvWrapper(gym.Wrapper):
@@ -33,8 +35,15 @@ class ResetEnvWrapper(gym.Wrapper):
         self.env.unwrapped.restore_full_state(self.snapshot)
         return self.env.unwrapped._get_obs()
     
-def uniform_random_policy(env):
-    return lambda _: env.action_space.sample()
+def uniform_random_policy(env, onehot=False):
+    if onehot:
+        return lambda _: du.onehot_int(env.action_space.sample(), env.action_space.n)
+    else:
+        return lambda _: env.action_space.sample()
+
+def vis_iterator(iterator):
+    for x in iterator:
+        yield x.state
 
 def s_iterator(env, policy):
     state = env.reset()
@@ -89,6 +98,15 @@ def ars_iterator(env, policy):
         state, reward, done, _ = env.step(action)
         yield tuple_ars(action, reward, state)
 
+def sas_iterator(env, policy):
+    state = env.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, _, done, _ = env.step(action)
+        yield tuple_sars(state, action, nstate)
+        state = nstate
+
 def sars_iterator(env, policy):
     state = env.reset()
     done = False
@@ -97,6 +115,8 @@ def sars_iterator(env, policy):
         nstate, reward, done, _ = env.step(action)
         yield tuple_sars(state, action, reward, nstate)
         state = nstate
+        
+
 
 def episode_iterator(iterator, env, policy, astuples=True, **kwargs):
     if astuples:

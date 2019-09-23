@@ -21,15 +21,15 @@ class VAE(AE.AE):
     def reparam(self, mean, logvar):
         return torch.FloatTensor(mean.size()).normal_().to(self.device) * torch.exp(logvar / 2.) + mean
 
-    def forward(self, x):
-        x = x.to(self.device)
-        mu, logvar = self.encoder(x)
+    def forward(self, *args):
+        args = [x.to(self.device) for x in args]
+        mu, logvar = self.encoder(*args)
         z = self.reparam(mu, logvar)
         return self.decoder(z), mu, logvar
     
-    def encode(self, x):
-        x = x.to(self.device)
-        mu, logvar = self.encoder(x)
+    def encode(self, *args):
+        args = [x.to(self.device) for x in args]
+        mu, logvar = self.encoder(*args)
         return mu, logvar
 
 def default2D(input_shape, latent_dim, share_weights=True):

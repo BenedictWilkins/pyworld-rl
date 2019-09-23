@@ -17,10 +17,10 @@ class Optimiser:
     def __init__(self, model):
         self.model = model
         
-    def loss(self, target, x, *args):
+    def loss(self, *args):
         pass
     
-    def step(self, x):
+    def step(self, *args):
         pass
     
 class AE(Optimiser):
@@ -51,25 +51,26 @@ class VAE(Optimiser):
     
     lfun = namedtuple('loss', 'mse bce')(F.mse_loss, F.binary_cross_entropy_with_logits)
     
-    def __init__(self, vae, loss, beta=1., lr=0.0005, ema_n = 100):
+    def __init__(self, vae, loss, beta=1., lr=0.0005):
         super(VAE, self).__init__(vae)
         self.cma = CMA('loss', 'kld_loss', loss.__name__)
         self.optim = torch.optim.Adam(vae.parameters(), lr=lr)
         self.beta = beta
         self._loss = loss
         
-    def loss(self, x_target, x, mu_z, logvar_z):
+    def loss(self, x, mu_z, logvar_z, x_target):
         x_target = x_target.to(self.model.device)
         kld_loss = self.beta * -0.5 * (1. + logvar_z - mu_z.pow(2) - logvar_z.exp()).sum()#.view(batch_size, -1).mean()
         return kld_loss, self._loss(x, x_target, reduction="sum")
     
-    def step(self, x):
+    def step(self, *args):        
         self.optim.zero_grad()
-        kld, lss = self.loss(x, *self.model(x))
+        kld, lss = self.loss(*self.model(*args[0:-1]), args[-1])
         loss = kld + lss
         self.cma.push(np.array([loss.item(), kld.item(), lss.item()]))
         loss.backward()
         self.optim.step()
+        return loss.item()
         
     def info(self):
         return {'model':type(self.model).__name__, 'loss': self._loss.__name__, 'optimiser':str(self.optim), 'beta':self.beta}

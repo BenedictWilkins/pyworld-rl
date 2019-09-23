@@ -15,4 +15,6 @@ from .algorithms.policygradient import PolicyGradient
 from . import algorithms
 from . import toolkit
 
-__all__ = ('common', 'agent', 'simulate', 'params', 'model', 'PolicyGradient', 'toolkit', 'algorithms')
+from . import environments
+
+__all__ = ('environments', 'common', 'agent', 'simulate', 'params', 'model', 'PolicyGradient', 'toolkit', 'algorithms')
