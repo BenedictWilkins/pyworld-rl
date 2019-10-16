@@ -6,6 +6,7 @@ Created on Fri Jun 14 11:41:32 2019
 @author: ben
 """
 import cv2
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
@@ -13,6 +14,47 @@ import numpy as np
 from . import fileutils as fu
 from . import datautils as du
 
+    
+def matplot_activate(use='Qt5Agg'):
+    matplotlib.use(use)
+    
+def matplot_deactivate():
+    matplotlib.use('Agg')
+
+def matplot_isopen():
+    return plt.get_fignums()
+
+def matlplot_isclosed():
+    return not plt.get_fignums()
+
+def savefig(fig, path, extension = ".png"):
+    if not fu.has_extension(path):
+        path = path + extension
+    path = fu.file(path)
+    
+    img = figtoimage(fig)
+
+    plt.imsave(path, img)
+
+def figtoimage(fig):
+    fig.canvas.draw()
+    # Get the RGBA buffer from the figure
+    w,h = fig.canvas.get_width_height()
+    buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    return buf.reshape((h, w, 3))
+    
+def savevideo(iterator, path, extension = ".mp4", fps=30):
+    import moviepy.editor as mpy
+    clip = mpy.ImageSequenceClip(iterator, fps=fps)
+    
+    if not fu.has_extension(path):
+        path = path + extension
+    path = fu.file(path)
+    
+    clip.write_videofile(path) # default codec: 'libx264', 24 fps
+    
+    
+    
 def save(image, path, extension = ".png"):
     image = du.normalise(image)
     if not fu.has_extension(path):
@@ -84,10 +126,17 @@ def label_colours(labels, alpha=0.8):
     for i in range(colours.shape[0]):
         result[labels[i]] = colours[i]
     return result
-    
 
 def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8, 
-                  title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001):
+                  title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001, draw = True):
+
+    if draw:
+        matplot_activate()
+        plt.ion()
+    else:
+        matplot_deactivate()
+        plt.ioff()
+        
     if fig is None:
         fig = plt.figure()
     if clf:
@@ -95,6 +144,7 @@ def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8,
 
     
     z = du.collect(model, x)
+    
     assert z.shape[1] == 2
     line_handles = []
     label_handles = []
@@ -102,9 +152,10 @@ def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8,
         y = np.ones(x.shape[0])
 
     data = du.splitbylabel(z, y)
+    #print(data)
     colours = label_colours(list(data.keys()), alpha)
     
-    for label,d in data.items():
+    for label, d in data.items():
         line = plt.scatter(d[:,0], d[:,1], color=colours[label],  edgecolors='none', label=label, marker=marker)
         line_handles.append(line)
         label_handles.append(label)
@@ -118,8 +169,9 @@ def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8,
     plt.suptitle(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.draw()
-    plt.pause(pause)
+    if draw:
+        plt.draw()
+        plt.pause(pause)
     return fig
 
 #123, 252, 3
@@ -196,7 +248,7 @@ def gallery(array, ncols=3):
 def show(array, name='image', wait=60):
     cv2.imshow(name, array)
     if wait >= 0:
-        return cv2.waitKey(wait)
+        return cv2.waitKey(wait) == ord('q')
     return
     
 def play(video, name='image', wait=60, repeat=False):

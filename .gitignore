@@ -1,2 +1,6 @@
-pyworld.egg-info
-pyworld/__pycache__
+*
+!*.py
+!.gitignore
+!readme.md
+!.gitkeep
+!*/

@@ -7,5 +7,6 @@ Created on Tue Sep  3 12:05:53 2019
 """
 
 from .objectmover import objectmover
+from .counter import counter
 
-__all__ = ('objectmover',)
+__all__ = ('objectmover', 'counter')

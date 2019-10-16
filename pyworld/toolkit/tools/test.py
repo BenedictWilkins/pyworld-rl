@@ -6,14 +6,18 @@ Created on Fri Jun 14 17:32:54 2019
 @author: ben
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    import pyworld.environments.objectmover as om
+    import pyworld.toolkit.tools.visutils as vu
+    import pyworld.toolkit.tools.gymutils as gu
+    
+    env = om.default()
+    policy =  gu.uniform_random_policy(env)
+    giter = gu.GymIterator(env, policy)
+    
+    data = gu.dynamic_dataset(env, policy, mode = gu.sa, size=1, onehot=True)
+    print(data)
 
-x1 = np.random.normal(size=1000)
-x2 = np.random.normal(size=1000)
+    
 
-y = np.outer(x1, x2)
-print(y)
-y = y.reshape(x1.shape[0] * x2.shape[0])
-
-plt.hist(y, normed=True, bins=50) #hmm.. wishart?
+    

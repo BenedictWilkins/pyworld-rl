@@ -6,7 +6,20 @@ Created on Mon May 20 16:53:40 2019
 @author: Benedict Wilkins
 """
 import numpy as np
+import itertools
 
+def exit_on(iterator, on):
+    for x in iterator:
+        yield x
+        if on():
+            return
+        
+def repeat(iterator, n, *args, **kwargs):
+    for i in range(n):
+        for x in iterator(*args, **kwargs):
+            yield (i, *x)
+
+#??? no idea what this was for..
 def display_increments2(total):
     j = 0
     i = 0
@@ -15,9 +28,13 @@ def display_increments2(total):
         yield j
         i += 1        
 
-def onehot(y):
-    y = y.squeeze()
-    r = np.zeros((y.shape[0], len(np.unique(y))))
+def onehot(y, size=None):
+    leny = size
+    if size is None:
+        leny = len(np.unique(y))
+    y = y.reshape(y.shape[0])
+    print(leny, y)
+    r = np.zeros((y.shape[0], leny))
     r[:, y] = 1.
     return r
 
@@ -49,7 +66,7 @@ def splitbylabel(x, y):
 def collect(model, x):
     j = 0
     result = np.empty((x.shape[0], 2))
-    for x_batch, i in batch_iterator(x):
+    for i, x_batch in batch_iterator(x):
         result[j:i] = model(x_batch)
         j = i
     return result
@@ -252,19 +269,120 @@ class EMA:
 def apply(iterator, fun):
     for i in iterator:
         yield fun(i)
- 
-def batch_iterator(*data, batch_size=16, shuffle=False):
-    m = max(len(d) for d in data)
+        
+''' DATASET '''
+
+def __shape__(i):
+    try:
+        return i.shape
+    except:
+        pass
+    try:
+        return (len(i),)
+    except:
+        pass
+    return (1,)
+
+def __dtype__(i):
+    try:
+        return i.dtype
+    except:
+        pass
+    try:
+        return type(i[0])
+    except:
+        pass
+    return type(i)
+
+
+def __init_dataset__(iterator, size):
+    
+    def non_singular_iterator(iterator):
+        for x in iterator:
+            yield (x,)
+            
+    x = next(iterator)
+    
+    singular = not isinstance(x, tuple)
+    if singular:
+        iterator = non_singular_iterator(iterator)
+        x = (x,)
+        
+    result = tuple([np.empty((size, *__shape__(i)), dtype=__dtype__(i)) for i in x])
+    for j in range(len(x)):
+        result[j][0] = x[j]
+    
+    return iterator, result
+
+def dataset(iterator, size=1000):
+    iterator, result = __init_dataset__(iterator, size)
+    iterator = itertools.islice(iterator, 0, size-1)
+    
+    for i, x in enumerate(iterator, 1):
+        for j in range(len(x)):
+            result[j][i] = x[j]
+    return result
+
+def dynamic_dataset(iterator, chunk=1, size=1000, random=False):
+    iterator, result = __init_dataset__(iterator, size)
+    iterator2 = itertools.islice(iterator, 0, size-1)
+    
+    for i, x in enumerate(iterator2, 1):
+        for j in range(len(x)):
+            result[j][i] = x[j]
+    if not random:
+        return __dynamic_dataset__(iterator, result, chunk, size)
+    else:
+        return __dynamic_dataset_random__(iterator, result, chunk, size)
+   
+def __dynamic_dataset__(iterator, result, chunk, size):
+    for i, x in enumerate(iterator, 0):
+        if not i % chunk:
+            yield result
+        for j in range(len(x)):
+            result[j][i % size] = x[j]
+            
+def __dynamic_dataset_random__(iterator, result, chunk, size):
+    for i, x in enumerate(iterator, 0):
+        if not i % chunk:
+            yield result
+        indx = np.random.randint(0, size)
+        for j in range(len(x)):
+            result[j][indx] = x[j]
+            
+
+            
+def batch_iterator(*data, batch_size=16, shuffle=False, circular=False):
     if shuffle:
-        indx = np.arange(m)
-        np.random.shuffle(indx)
-        data = [d[indx] for d in data]
+        data = __shuffle__(*data)
+    if not circular:
+        return __batch_iterator__(*data, batch_size=batch_size)
+    else:
+        return __batch_iterator_circular__(*data, batch_size=batch_size)
+
+def __batch_iterator_circular__(*data, batch_size):
+    i = 0
+    m = max(len(d) for d in data)
+    while True:
+        indx = np.arange(i,i + batch_size) % m
+        i += batch_size
+        yield (i, *[d[indx] for d in data])
+        
+def __batch_iterator__(*data, batch_size):
+    m = max(len(d) for d in data)
     j = 0
     for i in range(batch_size, m, batch_size):
-        yield (*[d[j:i] for d in data], i)
+        yield (i, *[d[j:i] for d in data])
         j = i
-    yield (*[d[j:] for d in data], m)
-    
+    yield (m, *[d[j:] for d in data]) #01/10/2019 swap argument order! to match enumerate
+        
+def __shuffle__(*data):
+    m = max(len(d) for d in data)
+    indx = np.arange(m)
+    np.random.shuffle(indx)
+    data = [d[indx] for d in data]
+    return data
+      
 def batch_iterator2(iterator, batch_size, limit=np.inf, btype=list):
     limit = limit * batch_size
     i = 0 
@@ -304,12 +422,41 @@ def group_avg(x,y):
     return unique, avg
 
 if __name__ == "__main__":
-    x = np.arange(64)
-    y = np.arange(64)
-    for x_, y_, i in batch_iterator(x,y, shuffle=True):
-        print(x_)
-        print(y_)
-        print()
+    import pyworld.toolkit.tools.gymutils as gu
+    import pyworld.environments.counter as counter
+    
+    def test_dataset(): 
+        env = counter.Counter()
+        policy = gu.uniform_random_policy(env)
+        iterator = gu.GymIterator(env, policy, episodic=False, mode=gu.sa)
+        
+        s,a = dataset(iterator, size=10)
+        print(s,a)
+    
+    def test_dynamic_dataset(random=False): 
+        env = counter.Counter()
+        policy = gu.uniform_random_policy(env)
+        iterator = gu.GymIterator(env, policy, episodic=False, mode=gu.s)
+        
+        gen = dynamic_dataset(iterator, size=10, random=random)
+        d = next(gen)
+        print("data", np.transpose(*d))
+        for i,s in batch_iterator(*d, batch_size=6, circular=True):
+            print(s)
+            if i > 20:
+                break
+            print("data", np.transpose(*next(gen)))
+    
+    def test_circular():
+        x = np.arange(12)
+        y = np.arange(12)
+        for i, x_, y_ in batch_iterator(x,y, batch_size=8, shuffle=False, circular=True):
+            print("x", x_)
+            print("y", y_)
+            if i > 100:
+                break
+            
+    test_dynamic_dataset(True)
         
    
     

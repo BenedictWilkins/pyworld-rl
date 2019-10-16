@@ -9,6 +9,7 @@ Created on Wed Jun 12 10:44:12 2019
 import torch
 import torch.nn as nn
 import numpy as np    
+from collections import namedtuple
 
 def load(model, *args, device = 'cpu', path = None, **kwargs):
     model_ = model(*args, **kwargs).to(device)

@@ -65,5 +65,4 @@ class DSANet(SANet):
         
     def forward(self, s, a):
         x_ = F.leaky_relu(super(DSANet,self).forward(s, a))
-        print(x_.shape)
         return self.output_activation(self.output_layer(x_))

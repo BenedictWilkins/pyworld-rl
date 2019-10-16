@@ -17,14 +17,16 @@ class CNet(nn.Module):
     '''
         A convolutional network that takes as input an image of dimension input_shape = (C,H,W).
     '''
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, device='cpu'):
         super(CNet, self).__init__() 
         self.input_shape = input_shape
         
         self.conv1 = nn.Conv2d(input_shape[0], 64, kernel_size=4, stride=2)
         self.conv2 = nn.Conv2d(64, 32, kernel_size=4, stride=1)
         self.conv3 =  nn.Conv2d(32, 16, kernel_size=4, stride=1)
-    
+        if device != 'cpu':
+            self.to(device)
+
         s1 = tu.conv_output_shape(input_shape[1:], kernel_size=4, stride=2)
         s2 = tu.conv_output_shape(s1, kernel_size=4, stride=1)
         s3 = tu.conv_output_shape(s2, kernel_size=4, stride=1)
