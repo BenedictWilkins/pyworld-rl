@@ -21,7 +21,7 @@ mode = namedtuple('mode', 'all top top_n, top_p')(0,1,2,3)
  
 class TripletOptimiser(Optimiser):
          
-    def __init__(self, model, margin = 0.2, norm=None, mode = mode.all, k = 16, lr=0.0005):
+    def __init__(self, model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005):
         super(TripletOptimiser, self).__init__(model)
         self.mode = mode
         self.__top = [(False, False), (True, True), (True, False), (False, True)]
@@ -30,11 +30,6 @@ class TripletOptimiser(Optimiser):
         self.optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.cma = du.CMA('loss')
         self.margin = margin
-
-        if norm is None:
-            self.norm = lambda x, y: (x-y).pow(2)
-        else:
-            self.norm = norm
     
     def step(self, x, y):
         self.optim.zero_grad()
@@ -50,7 +45,7 @@ class TripletOptimiser(Optimiser):
         d = self.distance_matrix(x_)
         unique = np.unique(y)
         loss = torch.FloatTensor(np.array([0.])).to(self.model.device)
-        #print("y", y)
+
         for u in unique:
             pi = np.nonzero(y == u)[0]
             ni = np.nonzero(y != u)[0]
@@ -61,9 +56,7 @@ class TripletOptimiser(Optimiser):
             if topk_p:
                 xp = self.topk2(xp, self.k, large=True)
             if topk_n:
-                #print(xn)
                 xn = self.topk2(xn, self.k, large=False)
-                #print(xn)
                 
             #3D tensor, (a - p) - (a - n) 
             #indexed as xf[:,i,:] for the ith anchor
@@ -117,6 +110,9 @@ if __name__ == "__main__":
         video = [vu.figtoimage(fig)]
 
     tro = TripletOptimiser(model, k = k, mode=mode.top_n)
+
+    
+    
     iterator = du.repeat(du.batch_iterator, epochs, x, y, batch_size = batch_size, shuffle = True)
     iterator = du.exit_on(iterator, vu.matlplot_isclosed)
     

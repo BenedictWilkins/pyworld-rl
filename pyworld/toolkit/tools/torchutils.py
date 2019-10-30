@@ -35,18 +35,24 @@ def distance_matrix(x,y):
     return dist_mat    
 
 def numpy(x):
+    '''
+        Converts x to a numpy array, detaching gradient information and moving to cpu if neccessary.
+    '''
     if isinstance(x, torch.Tensor):
         x = x.cpu()
         if x.requires_grad:
             x = x.detach()
         return x.numpy()
-    elif isinstance(x, np.array):
+    elif isinstance(x, np.ndarray):
         return x
     else:
         raise TypeError
 
 def tonumpy(model):
-    return lambda x: numpy(model(x))
+    '''
+        Converts the output of a function (model) to a numpy array using numpy(x).
+    '''
+    return lambda *x: numpy(model(*x))
     
 def device(display=True):
     device = None

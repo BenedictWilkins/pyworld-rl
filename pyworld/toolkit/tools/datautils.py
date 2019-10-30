@@ -8,16 +8,26 @@ Created on Mon May 20 16:53:40 2019
 import numpy as np
 import itertools
 
+from .debugutils import assertion
+
 def exit_on(iterator, on):
     for x in iterator:
         yield x
         if on():
             return
-        
+
+def invert(index, shape):
+    t = np.ones(shape, dtype=np.uint8)
+    t[index] = 0
+    return np.where(t)[0]
+     
 def repeat(iterator, n, *args, **kwargs):
     for i in range(n):
         for x in iterator(*args, **kwargs):
             yield (i, *x)
+            
+def limit(iterator, limit):
+    return itertools.islice(iterator, limit)
 
 #??? no idea what this was for..
 def display_increments2(total):
@@ -63,13 +73,7 @@ def splitbylabel(x, y):
         result[label] = x[(y==label).squeeze()]
     return result
 
-def collect(model, x):
-    j = 0
-    result = np.empty((x.shape[0], 2))
-    for i, x_batch in batch_iterator(x):
-        result[j:i] = model(x_batch)
-        j = i
-    return result
+
     
 class MeanAccumulator:
     
@@ -266,9 +270,7 @@ class EMA:
     def __repr__(self):
         return EMA.__name__ + '-' + str(self._m)
 
-def apply(iterator, fun):
-    for i in iterator:
-        yield fun(i)
+
         
 ''' DATASET '''
 
@@ -295,8 +297,7 @@ def __dtype__(i):
     return type(i)
 
 
-def __init_dataset__(iterator, size):
-    
+def __non_singular(iterator):
     def non_singular_iterator(iterator):
         for x in iterator:
             yield (x,)
@@ -307,51 +308,41 @@ def __init_dataset__(iterator, size):
     if singular:
         iterator = non_singular_iterator(iterator)
         x = (x,)
+    return iterator, x
+
+
+def __init_dataset(iterator, size, template=None):
+    iterator, x = __non_singular(iterator)
+    
+    if template is None:
+        result = tuple([np.empty((size, *__shape__(i)), dtype=__dtype__(i)) for i in x])
+    else:
+        assertion(not isinstance(template, tuple), 'template must be a tuple (may be singleton)')
+        assertion(not len(template) == len(x), 'invalid template size')
+        for i,t in enumerate(template):
+            assertion(not tuple(t.shape[1:]) == tuple(x[i].shape), 
+                      'template shape {0} and example shape {1} do not match at position {2}'.format(t.shape[1:], x[i].shape, i))
+        result = template
         
-    result = tuple([np.empty((size, *__shape__(i)), dtype=__dtype__(i)) for i in x])
     for j in range(len(x)):
         result[j][0] = x[j]
     
     return iterator, result
-
-def dataset(iterator, size=1000):
-    iterator, result = __init_dataset__(iterator, size)
-    iterator = itertools.islice(iterator, 0, size-1)
     
+def dataset(iterator, size=1000, template=None):
+    iterator, result = __init_dataset(iterator, size, template)
+    iterator = itertools.islice(iterator, 0, size-1)
+        
     for i, x in enumerate(iterator, 1):
         for j in range(len(x)):
             result[j][i] = x[j]
     return result
 
-def dynamic_dataset(iterator, chunk=1, size=1000, random=False):
-    iterator, result = __init_dataset__(iterator, size)
-    iterator2 = itertools.islice(iterator, 0, size-1)
-    
-    for i, x in enumerate(iterator2, 1):
-        for j in range(len(x)):
-            result[j][i] = x[j]
-    if not random:
-        return __dynamic_dataset__(iterator, result, chunk, size)
-    else:
-        return __dynamic_dataset_random__(iterator, result, chunk, size)
-   
-def __dynamic_dataset__(iterator, result, chunk, size):
-    for i, x in enumerate(iterator, 0):
-        if not i % chunk:
-            yield result
-        for j in range(len(x)):
-            result[j][i % size] = x[j]
-            
-def __dynamic_dataset_random__(iterator, result, chunk, size):
-    for i, x in enumerate(iterator, 0):
-        if not i % chunk:
-            yield result
-        indx = np.random.randint(0, size)
-        for j in range(len(x)):
-            result[j][indx] = x[j]
-            
+#refactor at some point...    
+def no_count(batch_iterator):
+    for b in batch_iterator:
+        yield b[1:]
 
-            
 def batch_iterator(*data, batch_size=16, shuffle=False, circular=False):
     if shuffle:
         data = __shuffle__(*data)
@@ -382,36 +373,46 @@ def __shuffle__(*data):
     np.random.shuffle(indx)
     data = [d[indx] for d in data]
     return data
-      
-def batch_iterator2(iterator, batch_size, limit=np.inf, btype=list):
-    limit = limit * batch_size
-    i = 0 
-    batch = []
-    for b in iterator:
-        i += 1
-        batch.append(b)
-        if i >= limit:
-            break
-        if not i % batch_size:
-            if len(batch) > 0:
-                yield (btype(batch), i)
-            batch = []
-    if len(batch) > 0:
-        yield (btype(batch) , i)
 
-def batch_iterator3(*data, batch_size=16 , p=None, iterations=None):
-    assert p is None #not implemented yet
-    m = max(len(d) for d in data)
-    if iterations is None:
-        iterations = int(m/batch_size)
-    for i in range(iterations):
-        indx = np.random.randint(0,m,batch_size)
-        yield (*[d[indx] for d in data], i)
+def collect(data, fun, unpack=True, batch_size=128):
+    iterator = no_count(batch_iterator(data, batch_size=batch_size))
+    z = pack_apply(iterator, fun, unpack)[0]
+    return np.concatenate(z)
+
+def apply(iterable, fun, unpack=True):
+    if unpack:
+        for i in iterable:
+            yield fun(*i)
+    else:
+        for i in iterable:
+            yield fun(i)
+            
+def pack_apply(iterable, fun, unpack=True):
+    iterable = apply(iterable, fun, unpack)
+    return pack(iterable)
+
+def pack(iterator):
+    '''
+        Packs the content of an iterator into numpy array(s)
+        Args:
+            iterator: with which to iterate over and collect values
+    '''
+    iterator, x = __non_singular(iterator)
+
+    result = tuple([[z] for z in x])
+        
+    for x in iterator:
+        for j in range(len(x)):
+            result[j].append(x[j])  
+            
+    return tuple([np.array(z) for z in result])
 
 def normalise(data):
     maxd = np.max(data)
     mind = np.min(data)
     return (data - mind) / (maxd - mind)
+
+
 
 def group_avg(x,y):
     unique = np.unique(x, axis=0)
@@ -421,45 +422,31 @@ def group_avg(x,y):
         avg[i] = y[(x==u).all(1)].mean()
     return unique, avg
 
-if __name__ == "__main__":
-    import pyworld.toolkit.tools.gymutils as gu
-    import pyworld.environments.counter as counter
+import threading
+
+def quit_on_key(key='q'):
     
-    def test_dataset(): 
-        env = counter.Counter()
-        policy = gu.uniform_random_policy(env)
-        iterator = gu.GymIterator(env, policy, episodic=False, mode=gu.sa)
-        
-        s,a = dataset(iterator, size=10)
-        print(s,a)
+    class QuitThread(threading.Thread):
     
-    def test_dynamic_dataset(random=False): 
-        env = counter.Counter()
-        policy = gu.uniform_random_policy(env)
-        iterator = gu.GymIterator(env, policy, episodic=False, mode=gu.s)
-        
-        gen = dynamic_dataset(iterator, size=10, random=random)
-        d = next(gen)
-        print("data", np.transpose(*d))
-        for i,s in batch_iterator(*d, batch_size=6, circular=True):
-            print(s)
-            if i > 20:
-                break
-            print("data", np.transpose(*next(gen)))
+        def __init__(self, key, name='quit-thread'):
+            self.key = key
+            super(QuitThread, self).__init__(name=name)
+            self.setDaemon(True)
+            self.start()
+            self.__quit = False
     
-    def test_circular():
-        x = np.arange(12)
-        y = np.arange(12)
-        for i, x_, y_ in batch_iterator(x,y, batch_size=8, shuffle=False, circular=True):
-            print("x", x_)
-            print("y", y_)
-            if i > 100:
-                break
-            
-    test_dynamic_dataset(True)
+        def run(self):
+            self.__quit = input() == self.key
+            while not self.__quit:
+                self.__quit = input() == self.key
+                
+        def quit(self):
+            return self.__quit
+    
+    return QuitThread(key).quit
         
    
-    
+
 
     
 

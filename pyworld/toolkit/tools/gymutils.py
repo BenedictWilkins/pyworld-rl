@@ -175,34 +175,28 @@ class GymIterator:
     
     def __iter__(self):
         return self
-
-def dynamic_dataset(env, policy, mode = s, chunk = 1, size = 1000, random = True):
-    iterator = GymIterator(env,policy, mode, episodic=False)
-    return du.dynamic_dataset(iterator, chunk, size, random)
         
 def dataset(env, policy, mode = s, size = 1000):
-    iterator = GymIterator(env,policy, mode, episodic=False)
-    return du.dataset(iterator, size)
+    iterator = GymIterator(env, policy, mode, episodic = False)
+    template = None 
+    while True:
+        template = du.dataset(iterator, size, template = template)
+        yield template
     
-def episode_iterator(iterator, env, policy, astuples=True, **kwargs):
-    if astuples:
-         while True:
-            obs =  []
-            for ob in iterator(env, policy, **kwargs):
-                obs.append(ob)
-            yield  obs
-    else:
-        while True:
-            yield [ob for ob in map(np.array, zip(*iterator(env, policy, **kwargs)))]
- 
+def episode(env, policy, mode = s):
+    assert mode in iterators
+    iterator = GymIterator(env, policy, mode, episodic = True)
+    return mode(*du.pack(iterator))
+    
+'''
 def sdr_episode_iterator(env, policy, gamma=0.99, iterator=sr_iterator):
-    '''
+
         Computes the total discounted reward for each state in a single episode
         args:
             env: environment
             policy: policy mapping states to actions
             gamma: discount factor
-    '''
+  
     for obs in episode_iterator(iterator, env, policy, astuples=False):
         #compute discounted reward in place
         rewards = obs[1]
@@ -211,6 +205,9 @@ def sdr_episode_iterator(env, policy, gamma=0.99, iterator=sr_iterator):
             rewards[i] = rewards[i] + gamma * dr
             dr = rewards[i]
         yield obs
+'''
+
+
 
 def assert_box(space):
     assert isinstance(space, gym.spaces.Box)
@@ -228,7 +225,7 @@ def assert_unique(space):
     assert len(high) == 1
     low = np.unique(space.low.ravel())
     assert len(low) == 1
-    return high[0], low[0]
+    return low[0], high[0] 
     
     
 class __OM_Gray:
@@ -264,7 +261,7 @@ class __OM_Resize:
     
     def __init__(self, env, shape):
         assert_box(env.observation_space)
-        high, low = assert_unique(env.observation_space)
+        low, high = assert_unique(env.observation_space)
         self.observation_space = gym.spaces.Box(low=low, high=high, shape=shape, dtype=np.float32)
     
     def __call__(self, state):
@@ -297,15 +294,44 @@ class __OM_Default:
 
 class __OM_CHW:
     
+    '''
+        Transforms states from HWC to CHW format suitable for pytorch image processing. 
+    '''
+    
     def __init__(self, env):
         assert_box(env.observation_space)
         low, high = assert_unique(env.observation_space)
+        #assumes HWC format
         channels = env.observation_space.shape[2]
+        height = env.observation_space.shape[0]
+        width = env.observation_space.shape[1]
+        
         assert channels == 1 or channels == 3 or channels == 4
-        self.observation_space = gym.spaces.Box(low = low, high = high, shape=(channels, *env.observation_space.shape[0:2]), dtype = env.observation_space.dtype)
+        self.observation_space = gym.spaces.Box(low = low, high = high, shape=(channels, height, width), dtype = env.observation_space.dtype)
         
     def __call__(self, state):
-        return np.swapaxes(state, 0, 2)
+        return state.transpose((2,0,1))
+        #return np.swapaxes(state, 0, 2)
+
+class __OM_HWC:
+    
+    '''
+        Transforms states from CHW to HWC format suitable for opencv (or PIL) processing.
+    '''
+    
+    def __init__(self, env):
+        assert_box(env.observation_space)
+        low, high = assert_unique(env.observation_space)
+        #assumes CHW format
+        channels = env.observation_space.shape[0]
+        height = env.observation_space.shape[1]
+        width = env.observation_space.shape[2]
+        
+        assert channels == 1 or channels == 3 or channels == 4
+        self.observation_space = gym.spaces.Box(low = low, high = high, shape=(height, width, channels), dtype = env.observation_space.dtype)
+        
+    def __call__(self, state):
+        return state.transpose((1,2,0))
 
 
 observation_mode = namedtuple('observation_transform', 'gray interval crop resize binary chw default')(
@@ -320,21 +346,6 @@ class ObservationWrapper(gym.ObservationWrapper):
         
     def observation(self, obs):
         return self.mode(obs)
-
-    
-'''
-def dataset(iterator, file, n=1000):
-    data = []
-    print("INFO: ")
-    for i in range(n):
-        data.append(next(iterator))
-        if not i % 100:
-            print('item:', i)
-    print('saving data')
-    with open(fileutils.name_file(file), 'wb') as fp:    
-        pickle.dump(data, fp)
-    print('done')
-'''
 
 def atari0():
     import atari_py as ap
@@ -358,6 +369,9 @@ def time_slice(values):
         rvalues.append(rv)
     return rvalues
 
+def video(env, policy):
+        for state in GymIterator(env, policy, mode=s):
+            yield state.state
 
 if __name__ == "__main__":
     import gym
@@ -366,15 +380,19 @@ if __name__ == "__main__":
     
     env = gym.make('Pong-v0')
     env = ObservationWrapper(env, observation_mode.default)
-    env = ObservationWrapper(env, observation_mode.chw)
+    #env = ObservationWrapper(env, observation_mode.chw)
     print(env.observation_space)
+    policy = uniform_random_policy(env)
     
-    def video(env, policy):
-        for state in GymIterator(env, policy, mode=s):
-            yield state.state
+    for d in dataset(env, policy, size = 100):
+        vu.play(d)
+        print('next')
+    #episode = episode(env, policy).state
+    #vu.play(episode)
+    
     
     #vu.play(video(env, uniform_random_policy(env)))
-    
+    #
     
     
     

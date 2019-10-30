@@ -36,6 +36,7 @@ class ObjectMover(gym.Env):
         super(ObjectMover, self).__init__()
         assert len(shape) == 3
         assert shape[0] == 1 or shape[0] == 3
+        
         self.__empty_state = np.ones(shape, dtype=np.float32) - int(cinvert)
         self.__empty_state[:,1:-1,1:-1] = int(cinvert)
         
@@ -61,16 +62,24 @@ class ObjectMover(gym.Env):
         state = self.mode()
         action = policy(state)
         nstate, action, _, _ = self.step(action)
-        return state, None, nstate
+        return state, 0., nstate
         
     def step(self, action):
         self.obj.vel = self.v_map[action]
         self.obj.pos += self.obj.vel
         self.__place()
-        return self.mode(), 0, False, None
+        return self.mode(), 0., self.__done(), None
     
-    def __done(self):
-        raise NotImplementedError()
+    def __done(self):        
+        x = int(self.obj.pos[0])
+        y = int(self.obj.pos[1])
+        
+        minx = 0
+        miny = 0
+        maxx = self.state.shape[2] - self.obj.img.shape[2]
+        maxy = self.state.shape[1] - self.obj.img.shape[1]
+        
+        return x == minx or y == miny or x == maxx or y == maxy
     
     def mode_image(self):
         return self.state
@@ -86,7 +95,7 @@ class ObjectMover(gym.Env):
         self.state = np.copy(self.__empty_state)
         x = int(self.obj.pos[0])
         y = int(self.obj.pos[1])
-        x = np.clip(x, 0, self.state.shape[2] - self.obj.img.shape[1])
+        x = np.clip(x, 0, self.state.shape[2] - self.obj.img.shape[2])
         y = np.clip(y, 0, self.state.shape[1] - self.obj.img.shape[1])
         #(C,H,W)
         self.state[:, y:y+self.obj.img.shape[1], x:x+self.obj.img.shape[2]] = self.obj.img
@@ -108,31 +117,32 @@ class ObjectMover(gym.Env):
 
 def a(environment_shape=(1,64,64), mode=mode_image):
     from PIL import Image, ImageDraw, ImageFont
+    import os
     #img = PIL.Image.open('imgs/a.png'))
-    img = Image.new('RGB', (16, 16), color = (0,0,0))
+    img = Image.new('RGB', (12,12), color = (0,0,0))
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype("'/Library/Fonts/Arial.ttf'", 15)
-    d.text((0,0), "a", font=font,fill=(255,255,255))
+    #print(os.path.dirname(__file__))
+    font = ImageFont.truetype(os.path.dirname(__file__) + "/ArialCE.ttf", 18)
+    d.text((1,-6), "a", font=font, fill=(255,255,255)) #dont ask...
     
-    obj_image = np.array(img) / 255.
-    cv2.imshow('t', obj_image)
+    obj_image = vu.CHW(vu.gray(np.array(img))/ 255.)
     
-    obj_pos = (np.array(environment_shape) / 2 + np.array(obj_image.shape) / 2)[0:2]
-    return ObjectMover(environment_shape, Object(obj_image, obj_pos), 4.,mode=mode)    
+    obj_pos = (np.array(environment_shape) / 2 - np.array(obj_image.shape) / 2)[1:]
+
+    return ObjectMover(environment_shape, Object(obj_image, obj_pos), 2., mode=mode)    
 
 
 def default(mode=mode_image):
     return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode)
-        
+
 if __name__ == "__main__":
     import pyworld.toolkit.tools.gymutils as gu
     #(C,H,W)
-    env = default() #a((1,32,64))
+    env = a() #a((1,32,64))
     policy = gu.uniform_random_policy(env)
-
-    for s,a in gu.sa_iterator(env, policy):
-        print(env.action_labels[a])
-        if env.render():
-            break
+    episode = gu.episode(env, policy).state
+    print(episode.shape)
+    #vu.play(episode)
+    vu.show(episode[0])   
 
         

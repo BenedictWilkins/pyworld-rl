@@ -7,14 +7,25 @@ Created on Fri May 17 16:56:21 2019
 """
 import os
 import pickle
+import datetime
 
-def file(file):
+import json
+
+def file(file, force=False):
+
+    path, _ = os.path.split(file)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    
     o_file, ext = split_extension(file)
     i = 0
     while os.path.isfile(file):
         i += 1
         file = '.'.join([o_file + "(" + str(i) + ")", ext])
     return file
+
+def file_datetime():
+    return str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
 
 def load(file):
     with open(file, 'rb') as fp:
@@ -28,3 +39,13 @@ def split_extension(file):
     
 def has_extension(file):
     return len(file.split('.')) > 1
+
+def save_json(obj, f):
+    f = file(f)
+    with open(f, 'w') as fp:
+        json.dump(obj, fp)
+
+def load_json(f):
+    with open(f, 'r') as fp:
+        data = json.load(fp)
+    return data

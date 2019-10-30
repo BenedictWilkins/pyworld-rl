@@ -11,10 +11,22 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 
+from enum import Enum
+
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+
+
 from . import fileutils as fu
 from . import datautils as du
 
-    
+
+
+
+def matplot_close(fig='all'):
+    plt.close(fig)
+
 def matplot_activate(use='Qt5Agg'):
     matplotlib.use(use)
     
@@ -24,8 +36,27 @@ def matplot_deactivate():
 def matplot_isopen():
     return plt.get_fignums()
 
-def matlplot_isclosed():
+def matplot_isclosed():
     return not plt.get_fignums()
+
+class plt_events(Enum):
+    press = 'button_press_event' 
+    release = 'button_release_event' 
+    draw = 'draw_event' 	
+    key_press = 'key_press_event' 	
+    key_release = 'key_release_event'
+    motion = 'motion_notify_event' 
+    pick = 'pick_event' 
+    resize = 'resize_event' 	
+    scroll = 'scroll_event' 
+    enter = 'figure_enter_event' 	
+    exit = 'figure_leave_event' 
+    enter_axes = 'axes_enter_event' 	
+    exit_axes = 'axes_leave_event'
+
+def listen(figure, event, listener):
+    print(event)
+    figure.canvas.mpl_connect(event.value, listener)
 
 def savefig(fig, path, extension = ".png"):
     if not fu.has_extension(path):
@@ -84,13 +115,37 @@ def gray(image):
 def colour(image):
     return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
+def CHW(data): #TORCH FORMAT
+    if len(data.shape) == 2:
+        return data[np.newaxis,:,:]
+    elif len(data.shape) == 3:    
+        return data.transpose((2,0,1))
+    elif len(data.shape) == 4:
+        return data.transpose((0,3,1,2))
+    else:
+        raise ValueError("invalid dimension: " + str(len(data.shape)))
+    
+def HWC(data): #CV2 FORMAT
+    if len(data.shape) == 2:
+        return data[:,:,np.newaxis]
+    if len(data.shape) == 3:    
+        return data.transpose((1,2,0))
+    elif len(data.shape) == 4:
+        return data.transpose((0,2,3,1))
+    else:
+        raise ValueError("invalid dimension: " + str(len(data.shape)))
+
+
+
 def channels_to_torch(data):
+    print("DEPRECATED USE CHW")
     if len(data.shape) == 4:
         return data.reshape((data.shape[0], data.shape[3], data.shape[1], data.shape[2]))
     elif len(data.shape) == 3:
         return data.reshape((data.shape[2], data.shape[0], data.shape[1]))
 
 def channels_to_cv(data):
+    print("DEPRECATED USE HWC")
     if len(data.shape) == 4:
         return data.reshape((data.shape[0], data.shape[2], data.shape[3], data.shape[1]))
     elif len(data.shape) == 3:
@@ -127,9 +182,7 @@ def label_colours(labels, alpha=0.8):
         result[labels[i]] = colours[i]
     return result
 
-def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8, 
-                  title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001, draw = True):
-
+def __new_plot(fig, draw=True, clf=True):
     if draw:
         matplot_activate()
         plt.ion()
@@ -139,40 +192,73 @@ def plot2D(model, x, y=None, fig=None, clf=True, marker=".", alpha=0.8,
         
     if fig is None:
         fig = plt.figure()
+        
     if clf:
         fig.clf()
+    
+    plt.figure(fig.number)
+    
+    return fig
 
-    
-    z = du.collect(model, x)
-    
-    assert z.shape[1] == 2
-    line_handles = []
-    label_handles = []
-    if y is None:
-        y = np.ones(x.shape[0])
-
-    data = du.splitbylabel(z, y)
-    #print(data)
-    colours = label_colours(list(data.keys()), alpha)
-    
-    for label, d in data.items():
-        line = plt.scatter(d[:,0], d[:,1], color=colours[label],  edgecolors='none', label=label, marker=marker)
-        line_handles.append(line)
-        label_handles.append(label)
-       
+def __update_plot(title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, draw=True, pause=0.001):
     if xlim is not None:
         plt.xlim(xlim)
     if ylim is not None:
         plt.ylim(ylim)
-        
-    plt.legend(line_handles, label_handles, loc="upper right")
     plt.suptitle(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if draw:
         plt.draw()
         plt.pause(pause)
+
+def histogram2D(x, bins, fig=None, draw=True, clf=True, title=None, stacked=False, xlabel=None, ylabel=None, labels=None, colour=None, alpha=1., log=False):
+    fig = __new_plot(fig, draw=draw, clf=clf)    
+    plt.hist(x, bins, color=colour, alpha=alpha, log=log, label=labels, stacked=stacked)
+    if labels:
+        plt.legend()
+    __update_plot(title, xlabel, ylabel)
     return fig
+
+def plot2D(model, x, y=None, fig=None, clf=True, marker=".", colour=None, alpha=0.8, 
+                  title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001, draw = True):
+    fig = __new_plot(fig, draw=draw, clf=clf)
+    
+    z = du.collect(x, model)
+    
+    assert z.shape[1] == 2 #...hmmmm
+    
+    if y is None:
+        __plot2D(z, marker=marker, colour=colour)
+    else:
+        __plot2D_split(z, y, colours=colour, alpha=alpha)
+    __update_plot(title, xlabel, ylabel, xlim, ylim, draw, pause)
+   
+    return fig
+
+def __plot2D(x, marker = '.', colour = None, alpha=1.):
+    plt.plot(x[:,0], x[:,1], marker, color=colour, alpha=alpha)
+
+def __plot2D_split(x, y, colours=None, alpha=1.):
+    line_handles = []
+    label_handles = []
+
+    data = du.splitbylabel(x, y)
+    
+    if colours is None:
+        colours = label_colours(list(data.keys()), alpha=alpha)
+    else:
+        assert(len(colours) == len(data.keys()))
+    
+    for label, d in data.items():
+        line = plt.scatter(d[:,0], d[:,1], color=colours[label],  edgecolors='none', label=label, marker='.')
+            
+        line_handles.append(line)
+        label_handles.append(label)
+        
+    plt.legend(line_handles, label_handles, loc="upper right")
+
+
 
 #123, 252, 3
 def show_attention(values, queries, weights, embed_size=None, display_shape=(240,480),
@@ -236,25 +322,66 @@ def figure_to_numpy(fig):
     return np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(h,w,3)  
     
 def gallery(array, ncols=3):
-    nindex, height, width, intensity = array.shape
+    array = __HWC_format(array) 
+    nindex, height, width, intensity = array.shape    
     nrows = nindex//ncols
-    assert nindex == nrows*ncols
+
+    fill = abs(nindex - ((nrows + 1) * ncols))
+    #print(ncols, nrows, fill, width, height)
+    if fill:
+        zeros = np.zeros((fill, height, width, intensity))
+        #print(array.shape, zeros.shape)
+        array = np.concatenate((array, zeros))
+        nindex, height, width, intensity = array.shape    
+        nrows = nindex//ncols
+        
+    #assert nindex == nrows*ncols
     # want result.shape = (height*nrows, width*ncols, intensity)
     result = (array.reshape(nrows, ncols, height, width, intensity)
               .swapaxes(1,2)
               .reshape(height*nrows, width*ncols, intensity))
     return result
 
-def show(array, name='image', wait=60):
+def __HWC_format(array):
+    '''
+        dim(array) == 2 transform to HWC format
+        dim(array) == 3 transform to HWC format
+        dim(array) == 4 transform to BHWC format
+    '''
+    chw = 0
+    hwc = 2
+    if len(array.shape) == 3:
+        pass
+    elif len(array.shape) == 2:
+        return array[:,:,np.newaxis]
+    elif len(array.shape) == 4:
+        chw += 1
+        hwc += 1
+    else:
+        raise ValueError("invalid image dimension: " + str(len(array.shape)))
+      
+    if array.shape[hwc] == 1 or array.shape[hwc] == 3 or array.shape[hwc] == 4:
+        return array
+    elif array.shape[chw] == 1 or array.shape[chw] == 3 or array.shape[chw] == 4:
+        return HWC(array)    
+
+def __HWC_show(name, array):
+    array = __HWC_format(array)
     cv2.imshow(name, array)
+
+def show(array, name='image', wait=60):
+    __HWC_show(name, array)
     if wait >= 0:
         return cv2.waitKey(wait) == ord('q')
     return
-    
+
+
+
+
 def play(video, name='image', wait=60, repeat=False):
     while True: 
         for f in video:
-            cv2.imshow(name, f)
+            __HWC_show(name, f)
             if cv2.waitKey(wait) == ord('q'):
                 close(name)
                 return
@@ -274,3 +401,17 @@ def waitclose(wait=60):
         close()
         return True
     return False
+
+class __images:
+    
+    def character(self, char):
+        W = H = 14
+        img = Image.new('RGB', (W,H), color = (0,0,0)) #(0,0,0))
+        draw = ImageDraw.Draw(img)
+        font = ImageFont.truetype(os.path.dirname(__file__) + "/ArialCE.ttf", 18)
+
+        w,h = font.getsize(char)
+        draw.text(((W-w)/2,(H-h)/2 - 2), char, font=font, fill=(255,255,255)) #dont ask...        
+        return CHW(gray(np.array(img)) / 255.)
+
+images = __images()

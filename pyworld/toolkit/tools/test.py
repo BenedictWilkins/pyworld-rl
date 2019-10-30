@@ -10,14 +10,21 @@ if __name__ == "__main__":
     import pyworld.environments.objectmover as om
     import pyworld.toolkit.tools.visutils as vu
     import pyworld.toolkit.tools.gymutils as gu
+    import gym
     
-    env = om.default()
-    policy =  gu.uniform_random_policy(env)
-    giter = gu.GymIterator(env, policy)
+    env = gym.make('Pong-v0')
+    env = gu.ObservationWrapper(env, gu.observation_mode.default)
+    #env = ObservationWrapper(env, observation_mode.chw)
+    print(env.observation_space)
+    policy = gu.uniform_random_policy(env)
     
-    data = gu.dynamic_dataset(env, policy, mode = gu.sa, size=1, onehot=True)
-    print(data)
+    #for d in gu.dataset(env, policy, size=10):
+    #    vu.play(d[0])
+    #    print("next")
+        
+    import numpy as np
+    
+    l22 = lambda x, y: np.dot((x-y), (x-y))
 
-    
-
-    
+    d = l22(np.arange(1,4), np.arange(0,3))
+    print(d)

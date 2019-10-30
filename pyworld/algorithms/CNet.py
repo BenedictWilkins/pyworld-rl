@@ -54,9 +54,10 @@ class CNet2(CNet):
         A convolutional network based on CNet with a fully connected output layer of given dimension.
     '''
     
-    def __init__(self, input_shape, output_shape, activation=lambda x: x):
+    def __init__(self, input_shape, output_shape, activation=nn.Identity()):
         super(CNet2, self).__init__(input_shape)
         self.out_layer = nn.Linear(self.output_shape, output_shape)
+        
         self.output_shape = output_shape
         self.activation = activation
         
