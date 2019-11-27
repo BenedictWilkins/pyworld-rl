@@ -6,8 +6,6 @@ Created on Mon Sep  9 14:56:00 2019
 @author: ben
 """
 
-print("WARNING - DEPRECATED: USE toolkit/nn/CNet.py instead!")
-
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F

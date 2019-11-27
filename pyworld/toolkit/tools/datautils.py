@@ -10,6 +10,14 @@ import itertools
 
 from .debugutils import assertion
 
+
+def arg(args, name, default):
+    if name in args:
+        return args[name]
+    else:
+        args[name] = default
+        return default
+
 def exit_on(iterator, on):
     for x in iterator:
         yield x
@@ -17,17 +25,39 @@ def exit_on(iterator, on):
             return
 
 def invert(index, shape):
+    '''
+        Get inverted index e.g. [1,3,4,5],10 -> [2,6,7,8,9]
+        Args:
+            index: to invert
+            shape: of the full index array
+        Return:
+            inverted index
+    '''
     t = np.ones(shape, dtype=np.uint8)
     t[index] = 0
     return np.where(t)[0]
      
 def repeat(iterator, n, *args, **kwargs):
+    '''
+        An iterator that repeats another iterator n times
+        Args:
+            iterator: iterator definiton
+            n: number of times to repeat
+            *args: arguments for the iterator
+            **kwargs: arguments for the iterator
+    '''
     for i in range(n):
         for x in iterator(*args, **kwargs):
             yield (i, *x)
             
-def limit(iterator, limit):
-    return itertools.islice(iterator, limit)
+def limit(iterable, limit):
+    '''
+        Limits the iterations of an iterable to limit
+        Args:
+            iterator: an iterable
+            limit: number of iterations before stopping
+    '''
+    return itertools.islice(iterable, limit)
 
 #??? no idea what this was for..
 def display_increments2(total):
@@ -308,8 +338,7 @@ def __non_singular(iterator):
     if singular:
         iterator = non_singular_iterator(iterator)
         x = (x,)
-    return iterator, x
-
+    return iterator, x    
 
 def __init_dataset(iterator, size, template=None):
     iterator, x = __non_singular(iterator)
@@ -329,14 +358,23 @@ def __init_dataset(iterator, size, template=None):
     
     return iterator, result
     
-def dataset(iterator, size=1000, template=None):
+def dataset(iterator, size=1000, template=None, progress=0):
     iterator, result = __init_dataset(iterator, size, template)
     iterator = itertools.islice(iterator, 0, size-1)
-        
-    for i, x in enumerate(iterator, 1):
-        for j in range(len(x)):
-            result[j][i] = x[j]
-    return result
+    if not progress:
+        for i, x in enumerate(iterator, 1):
+            for j in range(len(x)):
+                result[j][i] = x[j]
+        return result
+    else:
+        print("Constructing dataset of size: %d" % size)
+        for i, x in enumerate(iterator, 1):
+            if not i % progress:
+                print("progress: %d/%d" % (i, size))
+            for j in range(len(x)):
+                result[j][i] = x[j]
+        print("progress: %d/%d, done" % (size, size))
+        return result
 
 #refactor at some point...    
 def no_count(batch_iterator):

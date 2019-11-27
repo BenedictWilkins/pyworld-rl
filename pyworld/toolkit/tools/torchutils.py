@@ -9,7 +9,14 @@ Created on Wed Jun 12 10:44:12 2019
 import torch
 import torch.nn as nn
 import numpy as np    
-from collections import namedtuple
+
+def as_shape(shape):
+    if isinstance(shape, tuple):
+        return shape
+    elif isinstance(shape, int):
+        return (shape,)
+    else:
+        raise ValueError("Invalid shape argument: {0}".format(str(shape)))
 
 def load(model, *args, device = 'cpu', path = None, **kwargs):
     model_ = model(*args, **kwargs).to(device)
@@ -17,14 +24,13 @@ def load(model, *args, device = 'cpu', path = None, **kwargs):
         model_.load_state_dict(torch.load(path))    
     return model_
         
-    
 def batch_to_numpy(batch, types, copy=False):
     return [np.array(batch[i], copy=copy, dtype=types[i]) for i in range(len(batch))]
 
 def batch_to_tensor(batch, types, device='cpu'):
         return [types[i](batch[i]).to(device) for i in range(len(batch))]
     
-def distance_matrix(x,y):
+def distance_matrix(x, y):
     x = x.view(x.shape[0], -1)
     y = y.view(y.shape[0], -1)
     dist_mat = torch.empty((x.shape[0], y.shape[0]), dtype=x.dtype)
@@ -34,7 +40,7 @@ def distance_matrix(x,y):
         dist_mat[i] = sq_dist.view(1, -1)
     return dist_mat    
 
-def numpy(x):
+def to_numpy(x):
     '''
         Converts x to a numpy array, detaching gradient information and moving to cpu if neccessary.
     '''
@@ -48,11 +54,11 @@ def numpy(x):
     else:
         raise TypeError
 
-def tonumpy(model):
+def to_numpyf(model):
     '''
-        Converts the output of a function (model) to a numpy array using numpy(x).
+        Use: Wraps the output of a function (model) to a numpy array using numpy(x).
     '''
-    return lambda *x: numpy(model(*x))
+    return lambda *x: to_numpy(model(*x))
     
 def device(display=True):
     device = None
@@ -71,8 +77,6 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     h = floor( ((h_w[0] + (2 * pad) - ( dilation * (kernel_size[0] - 1) ) - 1 )/ stride) + 1)
     w = floor( ((h_w[1] + (2 * pad) - ( dilation * (kernel_size[1] - 1) ) - 1 )/ stride) + 1)
     return h, w
-
-
 
 class __inverse:
     
@@ -121,6 +125,7 @@ def default_conv2d(input_shape):
 
 
 if __name__ == "__main__":
-    x = torch.FloatTensor([[1],[2],[3],[4]])
-    z = distance_matrix(x,x)
-    print(z)
+    print(as_shape(1))
+    print(as_shape((1,1)))
+    print(as_shape(np.array([1,2,3]).shape))
+    print(as_shape(torch.FloatTensor(np.array([1,2,3])).shape))

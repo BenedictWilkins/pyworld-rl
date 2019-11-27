@@ -21,7 +21,46 @@ import os
 from . import fileutils as fu
 from . import datautils as du
 
+class track2D:
+    
+    def __init__(self, figure, x, z):
+        assert z.shape[1] == 2 #2d plot!
+        self.figure = figure
+        self.x = x
+        self.z = z
+        self.p = np.array([np.inf, np.inf])
+        self.figure.canvas.mpl_connect('motion_notify_event', lambda e: self.__imagetrack(e))
+        
+    def __imagetrack(self, event):
+        if event.xdata is not None and event.ydata is not None:
+            p = np.array([event.xdata, event.ydata])
+            zi = np.argmin(np.sum((self.z - p)**2, axis=1)) #TODO a bit inefficient...
+            cv2.imshow('tracking', self.x[zi])
 
+def umap(x, y=None, **kwargs):
+    import umap
+    if y is not None:
+        assert len(y.shape) == 1
+        
+    if len(x.shape) > 2:
+        x = x.reshape(x.shape[0],-1)
+    assert len(x.shape) == 2
+    
+    reducer = umap.UMAP(**kwargs)
+    reducer.fit(x, y)
+    
+    embedding = reducer.transform(x)
+    
+    fig = __new_plot(None, draw=True, clf=True)
+    if y is not None:
+        plt.scatter(embedding[:, 0], embedding[:, 1], c=y, cmap='Spectral', s=5)
+        u = np.unique(y)
+        plt.colorbar(boundaries=np.arange(len(u) + 1)-0.5).set_ticks(u)
+    else:
+        plt.scatter(embedding[:, 0], embedding[:, 1], s=5)
+    plt.gca().set_aspect('equal', 'datalim')
+    
+    return embedding, fig
 
 
 def matplot_close(fig='all'):
@@ -84,8 +123,6 @@ def savevideo(iterator, path, extension = ".mp4", fps=30):
     
     clip.write_videofile(path) # default codec: 'libx264', 24 fps
     
-    
-    
 def save(image, path, extension = ".png"):
     image = du.normalise(image)
     if not fu.has_extension(path):
@@ -134,9 +171,8 @@ def HWC(data): #CV2 FORMAT
         return data.transpose((0,2,3,1))
     else:
         raise ValueError("invalid dimension: " + str(len(data.shape)))
-
-
-
+        
+        
 def channels_to_torch(data):
     print("DEPRECATED USE CHW")
     if len(data.shape) == 4:
@@ -375,10 +411,7 @@ def show(array, name='image', wait=60):
         return cv2.waitKey(wait) == ord('q')
     return
 
-
-
-
-def play(video, name='image', wait=60, repeat=False):
+def play(video, name='video', wait=60, repeat=False):
     while True: 
         for f in video:
             __HWC_show(name, f)
@@ -413,5 +446,8 @@ class __images:
         w,h = font.getsize(char)
         draw.text(((W-w)/2,(H-h)/2 - 2), char, font=font, fill=(255,255,255)) #dont ask...        
         return CHW(gray(np.array(img)) / 255.)
+
+
+
 
 images = __images()

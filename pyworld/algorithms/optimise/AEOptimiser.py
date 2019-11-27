@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 14 11:22:46 2019
+Created on Wed Nov 27 14:35:59 2019
 
-@author: ben
+author: Benedict Wilkins
 """
 import torch
 import torch.nn.functional as F
@@ -12,17 +12,8 @@ from collections import namedtuple
 
 from pyworld.toolkit.tools.datautils import EMA, CMA
 
-class Optimiser:
-    
-    def __init__(self, model):
-        self.model = model
-        
-    def loss(self, *args):
-        pass
-    
-    def step(self, *args):
-        pass
-    
+from . import Optimise.Optimiser as Optimiser
+ 
 class AE(Optimiser):
     
     lfun = namedtuple('loss', 'mse bce')(F.mse_loss, F.binary_cross_entropy_with_logits)
@@ -196,5 +187,3 @@ class VAEGAN(Optimiser):
             gan.backward()
             self.optim_disc.step()
             
-
-

@@ -5,9 +5,6 @@ Created on Tue Sep  3 11:36:03 2019
 
 @author: ben
 """
-
-print("WARNING - DEPRECATED: USE toolkit/nn/SANet.py instead!")
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -61,6 +58,10 @@ class SANet(nn.Module):
         
 class SANet2(SANet):
     
+    '''
+        An extension to SANet that includes an output layer of a given size.
+    '''
+    
     def __init__(self, state_shape, action_shape, output_shape, output_activation=nn.Identity()):
         super(SANet2, self).__init__(state_shape, action_shape)
         output_shape = tu.as_shape(output_shape)
@@ -72,3 +73,30 @@ class SANet2(SANet):
     def forward(self, sa):
         x_ = F.leaky_relu(super(SANet2, self).forward(sa))
         return self.output_activation(self.output_layer(x_))
+    
+    
+class SANet3(torch.Module):
+    
+    '''
+        Similar to SANet2, but an MLP (without convolutions) network that takes in a vectorised state of dimension state_shape = (M,),
+        and a 1-hot representation of a discrete action of dimension action_shape = (N,). 
+    '''
+    
+    def __init__(self, state_shape, action_shape, output_shape):
+        self.action_shape = tu.as_shape(action_shape)
+        self.state_shape = tu.as_shape(state_shape)
+        self.output_shape = tu.as_shape(output_shape)
+        
+        _iaction_shape = self.action_shape[0] * 64
+        _istate_shape = self.state_shape[0] * 64
+        self.action_layer1 = nn.Linear(self.action_shape[0], _iaction_shape)
+
+        self.state_layer1 = nn.Linear(self.state_shape[0], _istate_shape)
+
+        _icom_shape = (_istate_shape + _iaction_shape) // 2
+        self.com_layer1 = nn.Linear(_istate_shape + _iaction_shape, _icom_shape)
+        self.com_layer2 = nn.Linear(_icom_shape, self.output_shape[0])
+        
+    def forward(self, sa):
+        s, a = sa
+    

@@ -3,7 +3,7 @@
 """
 Created on Wed Oct 30 11:22:57 2019
 
-@author: ben
+@author: Benedict Wilkins
 """
 
 from . import mlp

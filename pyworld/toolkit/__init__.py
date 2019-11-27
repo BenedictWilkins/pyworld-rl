@@ -8,5 +8,6 @@ Created on Wed May 29 17:42:17 2019
 
 from . import diagnostics
 from . import tools
+from . import nn
 
-__all__ = ('diagnostics', 'tools')
+__all__ = ('diagnostics', 'tools', 'nn')

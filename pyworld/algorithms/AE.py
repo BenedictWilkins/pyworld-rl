@@ -238,7 +238,7 @@ def plot_latent2D(ae, x, y=None, fun=None, marker=".", fig=None, clf=True, alpha
     line_handles = []
     label_handles = []
 
-    z = ae.apply(x, lambda x : tu.numpy(fun(x)), (x.shape[0], ae.latent_dim), batch_size=64)
+    z = ae.apply(x, lambda x : tu.to_numpy(fun(x)), (x.shape[0], ae.latent_dim), batch_size=64)
     if z.shape[1] > 2:
         z = PCA.PCA(z, k=2) #reduce dimensions again...!
         

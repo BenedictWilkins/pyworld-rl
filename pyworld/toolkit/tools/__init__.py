@@ -12,6 +12,5 @@ from . import datautils
 from . import torchutils
 from . import fileutils
 from .debugutils import assertion
-import nn
 
-__all__ = ('gymutils', 'visutils', 'datautils', 'torchutils', 'fileutils', 'assertion', 'nn')
+__all__ = ('gymutils', 'visutils', 'datautils', 'torchutils', 'fileutils', 'assertion')

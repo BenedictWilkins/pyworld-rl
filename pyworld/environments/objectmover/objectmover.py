@@ -32,7 +32,7 @@ class ObjectMover(gym.Env):
     '''
         ObjectMover is an environment in which a single object can be moved around in the cardinal directions.
     '''
-    def __init__(self, shape, obj, base_vel=1.0, cinvert=False, mode=mode_image):
+    def __init__(self, shape, obj, base_vel=1.0, cinvert=False, mode=mode_image, none_action=False):
         super(ObjectMover, self).__init__()
         assert len(shape) == 3
         assert shape[0] == 1 or shape[0] == 3
@@ -49,10 +49,12 @@ class ObjectMover(gym.Env):
         self.mode = [self.mode_image, self.mode_position, self.mode_image_position][mode]
 
             
-        self.v_map = {0:np.array([0.,-base_vel]),1:np.array([0.,base_vel]),2:np.array([-base_vel,0.]),3:np.array([base_vel,0.])}
-        self.action_labels = {0:'NORTH', 1:'SOUTH', 2:'EAST', 3:'WEST'}
+        self.v_map = {0:np.array([0.,-base_vel]),1:np.array([0.,base_vel]),
+                      2:np.array([-base_vel,0.]),3:np.array([base_vel,0.]),
+                      4:np.array([0.,0.])}
+        self.action_labels = {0:'NORTH', 1:'SOUTH', 2:'EAST', 3:'WEST', 4:'NONE'}
 
-        self.action_space = gym.spaces.Discrete(4)
+        self.action_space = gym.spaces.Discrete(4 + int(none_action))
         self.observation_space = gym.spaces.Box(low=0., high=1., shape=shape, dtype=np.float32)
         
     def sample_step(self, position, policy):
@@ -65,6 +67,7 @@ class ObjectMover(gym.Env):
         return state, 0., nstate
         
     def step(self, action):
+#        print(action)
         self.obj.vel = self.v_map[action]
         self.obj.pos += self.obj.vel
         self.__place()
@@ -115,7 +118,7 @@ class ObjectMover(gym.Env):
             return True
         return False
 
-def a(environment_shape=(1,64,64), mode=mode_image):
+def a(environment_shape=(1,64,64), mode=mode_image, none_action=False):
     from PIL import Image, ImageDraw, ImageFont
     import os
     #img = PIL.Image.open('imgs/a.png'))
@@ -129,11 +132,11 @@ def a(environment_shape=(1,64,64), mode=mode_image):
     
     obj_pos = (np.array(environment_shape) / 2 - np.array(obj_image.shape) / 2)[1:]
 
-    return ObjectMover(environment_shape, Object(obj_image, obj_pos), 2., mode=mode)    
+    return ObjectMover(environment_shape, Object(obj_image, obj_pos), 2., mode=mode, none_action=none_action)    
 
 
-def default(mode=mode_image):
-    return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode)
+def default(mode=mode_image, none_action=False):
+    return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode, none_action=none_action)
 
 if __name__ == "__main__":
     import pyworld.toolkit.tools.gymutils as gu

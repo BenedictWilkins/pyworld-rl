@@ -72,19 +72,7 @@ def qval_info(states, net, info):
     info.info_trackers['qval'].step(np.mean(qvals.max(1)))
 
 
-#TODO make more efficient - dont create a class every time this is called.
-
-def batch(batch_labels):
-     t = namedtuple('batch', batch_labels)
-     #t.__new__.__defaults__ = tuple([[] for _ in range(len(batch_labels))])
-     return t
-                
-def batch_to_numpy(batch, types, copy=False):
-    return [np.array(batch[i], copy=copy, dtype=types[i]) for i in range(len(batch))]
-
-def batch_to_tensor(batch, types, device='cpu'):
-        return [types[i](batch[i]).to(device) for i in range(len(batch))]
-        '''    
+'''    
 class UnrollSensor1:
     
     def __init__(self, callback, gamma=0.99, steps=2):
