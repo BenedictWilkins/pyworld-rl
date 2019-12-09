@@ -9,6 +9,8 @@ import cv2
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from matplotlib.animation import FuncAnimation
+
 import numpy as np
 
 from enum import Enum
@@ -20,6 +22,61 @@ import os
 
 from . import fileutils as fu
 from . import datautils as du
+
+class HeatmapAnimation:
+    
+    def __init__(self, update, interval=10):
+        self.grid = None
+        self.update = update
+        self.interval = interval
+        self.fig = None
+        #self.stop_interactive = False
+        
+    # function to update figure
+    def __update__(self, *args):
+        print("update", args)
+        # set the data in the axesimage object
+        self.grid = self.update(self.grid)
+        self.im.set_array(self.grid)
+        # return the artists set
+        return self.im,
+    
+    def show(self, grid, vmin=0., vmax=1.):
+        self.grid = grid
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111)
+        self.im = plt.imshow(grid, vmin=vmin, vmax=vmax)
+        
+        self.ani = FuncAnimation(self.fig, self.__update__, interval=self.interval)
+        plt.show()
+    
+    '''
+    def interactive(self, grid):
+        self.grid = grid
+        plt.ion()
+        self.fig = plt.figure()
+        self.fig.canvas.mpl_connect('close_event', self.handle_close)
+        self.ax = self.fig.add_subplot(111)
+        self.data = self.ax.imshow(self.grid)
+        #(self.grid)
+        
+    def interactive_update(self, *args):
+        print("update...")
+        if not self.stop_interactive:
+            self.grid = self.update(self.grid, *args)
+            self.ax.clear()
+            
+            self.data = self.ax.imshow(self.grid)
+            plt.draw()
+            #plt.pause(0.001)
+            #show(self.grid)
+    ''' 
+    
+    
+    def handle_close(self, evt):
+        plt.close(self.fig)
+        self.stop_interactive = True
+
 
 class track2D:
     
@@ -260,7 +317,7 @@ def plot2D(model, x, y=None, fig=None, clf=True, marker=".", colour=None, alpha=
                   title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001, draw = True):
     fig = __new_plot(fig, draw=draw, clf=clf)
     
-    z = du.collect(x, model)
+    z = du.collect(model, x)
     
     assert z.shape[1] == 2 #...hmmmm
     
@@ -407,6 +464,7 @@ def __HWC_show(name, array):
 
 def show(array, name='image', wait=60):
     __HWC_show(name, array)
+    print("SHOW")
     if wait >= 0:
         return cv2.waitKey(wait) == ord('q')
     return

@@ -104,7 +104,7 @@ class GymIterator:
         self.__env = env
 
         if policy is None:
-            policy = uniform_random_policy(env, onehot=onehot)
+            policy = uniform_random_policy(env.action_space, onehot=onehot)
         self.__policy = policy
         
         self.__iterator_type = iterators[mode]

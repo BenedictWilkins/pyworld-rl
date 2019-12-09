@@ -15,7 +15,7 @@ from collections import namedtuple
 
 
 import pyworld.toolkit.tools.datautils as du
-from pyworld.algorithms.optimise import Optimiser
+from .Optimise import Optimiser
 
 mode = namedtuple('mode', 'all top top_n, top_p')(0,1,2,3)  #enum?
 

@@ -11,6 +11,28 @@ import cv2
 from collections import namedtuple
 #from enum import Enum
 
+def stack(states, frames=3, step=1):
+    assert len(states.shape) == 4 #BCHW format
+    assert states.shape[1] == 1 #must be in BCHW format, RGB channels not implemented yet...
+    
+    result = np.empty((states.shape[0], states.shape[1] * frames, *states.shape[2:]))
+
+    result[:,0] = states[:,0]
+    for i in range(1,frames):
+        result[i*step:,i] = states[:-i*step,0]   
+        result[:i*step,i] = np.zeros((i*step,*states.shape[2:]))
+    
+    return result
+
+
+if __name__ == "__main__":
+    print("test")
+    t = np.random.randint(0,10, size=(5,1,3,3))
+    s = stack(t)
+    print(s)
+
+
+
 def assert_box(space):
     assert isinstance(space, gym.spaces.Box)
     
@@ -28,7 +50,27 @@ def assert_unique(space):
     low = np.unique(space.low.ravel())
     assert len(low) == 1
     return low[0], high[0] 
+
+class __OM_Stack:
     
+    def __init__(self, env, stack=3):
+        assert stack >= 1
+        assert_box(env.observation_space)
+        low, high = assert_unique(env.observation_space)
+        channels = env.observation_space.shape[0]
+        assert channels == 1 # must be in CHW format!
+        
+        self.observation_space = gym.spaces.Box(low=low, high=high, shape=(env.observation_space.shape[0] * stack, *env.observation_space.shape[1:]), dtype=env.observation_space.dtype)
+        
+        self.states = np.zeros((stack*channels, *env.observation_space.shape[1:]), dtype=self.observation_space.dtype)
+        self.indx = (np.arange(0,stack) -1) % stack
+        
+    def __call__(self, state):
+        self.states = self.states[self.indx] #this will make a copy 
+        self.states[0] = state[0]
+        return self.states
+
+  
 class __OM_Gray:
     
     def __init__(self, env):
@@ -70,7 +112,7 @@ class __OM_Resize:
 
 
 class __OM_Binary:
-    def __init__(self, env, threshold):
+    def __init__(self, env, threshold=0.5):
         assert_box(env.observation_space)
         low, high = assert_unique(env.observation_space)
         
@@ -88,10 +130,10 @@ class __OM_Default:
         self.observation_space = gym.spaces.Box(low=0., high=1.0, shape=(84, 84, 1), dtype=np.float32)
         
     def __call__(self, state):
-        img = (state[:, :, 0] * 0.299 + state[:, :, 1] * 0.587 + state[:, :, 2] * 0.114).astype(np.float32) #gray
+        img = (state[:, :, 0] * 0.299 + state[:, :, 1] * 0.587 + state[:, :, 2] * 0.114) #gray
         img = cv2.resize(img, (84, 110), interpolation=cv2.INTER_AREA) #resize
         img = img[18:102, :] / 255.0 #crop
-        return img.reshape((*img.shape, 1))  
+        return img.reshape((*img.shape, 1)).astype(np.float32)  
 
 class __OM_CHW:
     
@@ -143,5 +185,13 @@ class observation_mode(Enum):
     default = __OM_Default
 '''
 
-mode = namedtuple('observation_transform', 'gray interval crop resize binary chw default')(
-                                    __OM_Gray, __OM_Interval, __OM_Crop, __OM_Resize, __OM_Binary, __OM_CHW, __OM_Default)
+mode = namedtuple('observation_transform', 'gray interval crop resize binary chw stack default')(
+                                    __OM_Gray, __OM_Interval, __OM_Crop, __OM_Resize, __OM_Binary, __OM_CHW, __OM_Stack, __OM_Default)
+
+
+
+    
+    
+
+
+

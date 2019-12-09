@@ -6,6 +6,9 @@ Created on Mon Nov 25 13:04:02 2019
 author: Benedict Wilkins
 """
 import gym
+import atari_py as ap
+
+import numpy as np
 
 from .. import datautils as du
 
@@ -15,22 +18,35 @@ from . import wrappers
 from . import transformation
 from . import mode
 
+
 __all__ = ('iterators', 'policy', 'wrappers', 'transformation', 'mode')
 
-def env(name = 'Pong-v0', binary=None):
+no_transform  = ['ObjectMover-v0', 'ObjectMover-v1']
+
+def make(name = 'Pong-v0', binary=None, stack=None):
     '''
         Creates pre-wrapped environments from gym. The state space is reduce to (H,W,C) format - (84,84,1). The action space is unchanged.
         Arguments:
             name: of the envionment to make
             binary: a value [0,1] as the threshold for binarising the state space, or None if the binary transformation is not required.
+            stack: stacks N > 1 previous frames included as part of the state, new observation shape is [N * C, H, W], or None is frame stacking is not required.
         Returns:
             a gym environment
     '''
     env = gym.make(name) #'PongNoFrameskip-v4')
+    if name in no_transform:
+        return env
+    
     env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.default)
+    
     if binary is not None:
-        env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.binary, binary)
+        env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.binary, threshold=binary)
+        
     env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.chw)
+        
+    if stack is not None and stack > 1:
+        env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.stack, stack=stack)
+    
     return env
 
 def atari0():
@@ -96,4 +112,25 @@ def episodes(env, policy=None, mode=mode.s, onehot=False, epochs=1):
     for i in range(epochs):
          iterator = iterators.GymIterator(env, policy, mode, onehot=onehot, episodic = True)
          yield mode(*du.pack(iterator))
+
+def returns(rewards, gamma=0.99):
+    returns = np.zeros_like(rewards) #np.empty_like(rewards)
+    returns[-1] = rewards[-1]
+    for i in range(2, rewards.shape[0]+1):
+        returns[-i] = rewards[-i] + gamma * returns[-i+1]
+    return returns
+
+    
+    
+    
+    
+
+
+
+
+
+
+
+
+
 

@@ -7,17 +7,69 @@ Created on Tue Mar 12 14:22:16 2019
 """
 
 import collections
-import gym
 import numpy as np
-import random
-import matplotlib.pyplot as plt
-import Animation as Ani
 
+from pyworld.toolkit.tools.gymutils import policy
+
+def default_dict():
+    return collections.defaultdict(float)
+
+class TabularQLearning:
+  
+    def __init__(self, action_space, gamma=0.99, alpha=0.1, temp=1.):
+        self.values = collections.defaultdict(default_dict)
+        self.action_space = action_space
+        self.gamma = gamma
+        self.alpha = alpha
+        self.boltzman_dist = policy.value.boltzmann(temp)
+    
+    def update(self, s, a, r, sn):
+        q = self.values[s][a]
+        mq = self.values[sn][self.greedy_action(sn)] #max action or random by default
+        self.values[s][a] = (1-self.alpha) * q + self.alpha * (r + self.gamma * mq)
+
+    def action_probs(self, state):
+        action_values = np.array([[k,v] for k,v in self.values[state].items()])
+
+        if action_values.shape[0] == 0:
+            return np.full(self.action_space.n, 1./self.action_space.n), np.zeros(self.action_space.n) #default uniform when we got no values yet!
+
+        values = np.zeros(self.action_space.n)      #default Q(s,a) = 0
+        values[action_values[:,0].astype(np.int8)] = action_values[:,1] #update the actions we have values for
+        probs = self.boltzman_dist(values)           #get action probabilities
+        return probs, values
+        
+    def policy(self, state):
+        probs, _ = self.action_probs(state)
+        return np.random.choice(np.arange(self.action_space.n), p=probs)
+    
+    def state_value(self, state):
+        probs, values = self.action_probs(state)
+        return np.dot(probs, values)
+    
+    def state_action_value(self, state, action):
+        return self.values[state][action]
+        
+    def greedy_action(self, state):
+        return max(self.values[state].keys(), key=(lambda action: self.values[state][action]), default=self.action_space.sample())
+
+    
+
+
+    '''
+    def policy(self, state):
+        if np.random.uniform() > self.epsilon:
+            return self.greedy_action(state)
+        else:
+            return self.action_space.sample()
+    '''
+    
+'''
 class QLearning:
      
     def __init__(self, env):  
         """
-        Initialise the ValueIteration algorithm. 
+        Initialise the Tabular Q-Learning algorithm. 
         Args:
             env - training environment
             gamma - discount factor
@@ -29,10 +81,6 @@ class QLearning:
         self.greedy_action = (lambda s: max(self.values[s].keys(), key=(lambda k: self.values[s][k]), default=self.random_action()))
 
     def update_value(self, s, a, r, sn, alpha = 0.1, gamma = 0.9):
-        """
-            Args:    
-            Returns: 
-        """
         q = self.values[s][a]
         mq = self.values[sn][self.greedy_action(sn)] #max action or random by default
         self.values[s][a] = (1-alpha) * q + alpha * (r + gamma * mq)
@@ -117,3 +165,4 @@ if __name__ == "__main__":
         #ql.play_episode(env, lambda s: ql.e_greedy_policy(s, epsilon=0.0), render=False)
         total += ql.play_episode(env, lambda s: ql.e_greedy_policy(s, epsilon=0.0), render=False)
     print("TotalReward:",total/TEST_EPISODES)
+'''

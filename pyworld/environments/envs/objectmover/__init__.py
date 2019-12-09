@@ -118,7 +118,7 @@ class ObjectMover(gym.Env):
             return True
         return False
 
-def a(environment_shape=(1,64,64), mode=mode_image, none_action=False):
+def a(shape=(1,64,64), mode=mode_image, none_action=False):
     from PIL import Image, ImageDraw, ImageFont
     import os
     #img = PIL.Image.open('imgs/a.png'))
@@ -130,22 +130,14 @@ def a(environment_shape=(1,64,64), mode=mode_image, none_action=False):
     
     obj_image = vu.CHW(vu.gray(np.array(img))/ 255.)
     
-    obj_pos = (np.array(environment_shape) / 2 - np.array(obj_image.shape) / 2)[1:]
+    obj_pos = (np.array(shape) / 2 - np.array(obj_image.shape) / 2)[1:]
 
-    return ObjectMover(environment_shape, Object(obj_image, obj_pos), 2., mode=mode, none_action=none_action)    
+    return ObjectMover(shape, Object(obj_image, obj_pos), 2., mode=mode, none_action=none_action)    
 
 
 def default(mode=mode_image, none_action=False):
     return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode, none_action=none_action)
 
-if __name__ == "__main__":
-    import pyworld.toolkit.tools.gymutils as gu
-    #(C,H,W)
-    env = a() #a((1,32,64))
-    policy = gu.uniform_random_policy(env)
-    episode = gu.episode(env, policy).state
-    print(episode.shape)
-    #vu.play(episode)
-    vu.show(episode[0])   
+
 
         

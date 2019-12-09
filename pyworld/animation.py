@@ -36,17 +36,20 @@ class HeatmapAnimation:
         self.data = None
         self.stop_interactive = False
         
+       
+    ''' #TODO fix this
     def __update__(self, i):
         self.grid = self.update(i, self.grid)
         self.ax.clear()
         self.data.set_data(self.grid)
-    
+   
     def show(self):
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111)
         self.ani = FuncAnimation(self.fig, self.__update__, interval=self.interval)
-        plt.show()
-        
+        self.data = plt.show()
+    '''
+    
     def interactive(self):
         plt.ion()
         self.fig = plt.figure()
@@ -71,10 +74,11 @@ if __name__ == "__main__":
         return np.random.random((10,10))
     
     h = HeatmapAnimation(np.random.random((10,10)), update)
-    h.interactive()
+    h.show()
+    #h.interactive()
     
-    for i in range(10000):
-        h.interactive_update(0)
+    #for i in range(10000):
+    #    h.interactive_update(0)
     
     '''
     def update(i,X,Y,Z):

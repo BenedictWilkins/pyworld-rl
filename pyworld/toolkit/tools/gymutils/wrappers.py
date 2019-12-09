@@ -39,9 +39,9 @@ class ObservationWrapper(gym.ObservationWrapper):
     
     mode = transformation.mode
 
-    def __init__(self, env, mode, *modeargs):
+    def __init__(self, env, mode, **modeargs):
         super(ObservationWrapper, self).__init__(env)
-        self.mode = mode(env, *modeargs)
+        self.mode = mode(env, **modeargs)
         self.observation_space = self.mode.observation_space
         
     def observation(self, obs):

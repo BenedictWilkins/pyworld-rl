@@ -8,7 +8,9 @@ Created on Wed Jun 12 10:44:12 2019
 
 import torch
 import torch.nn as nn
-import numpy as np    
+import numpy as np   
+
+from . import datautils as du 
 
 def as_shape(shape):
     if isinstance(shape, tuple):
@@ -17,6 +19,13 @@ def as_shape(shape):
         return (shape,)
     else:
         raise ValueError("Invalid shape argument: {0}".format(str(shape)))
+
+
+def collect(fun, *data, batch_size=128):
+    if len(data) == 1:
+        return torch.cat(du.__collect_singular(fun, *data, batch_size=batch_size), 0)
+    else:
+        raise NotImplementedError()
 
 def load(model, *args, device = 'cpu', path = None, **kwargs):
     model_ = model(*args, **kwargs).to(device)

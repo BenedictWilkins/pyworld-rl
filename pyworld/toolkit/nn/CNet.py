@@ -21,9 +21,9 @@ class CNet(nn.Module):
         super(CNet, self).__init__() 
         self.input_shape = tu.as_shape(input_shape)
         
-        self.conv1 = nn.Conv2d(self.input_shape[0], 64, kernel_size=4, stride=2)
-        self.conv2 = nn.Conv2d(64, 32, kernel_size=4, stride=1)
-        self.conv3 =  nn.Conv2d(32, 16, kernel_size=4, stride=1)
+        self.conv1 = nn.Conv2d(self.input_shape[0], 16, kernel_size=4, stride=2)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=4, stride=1)
+        self.conv3 =  nn.Conv2d(32, 64, kernel_size=4, stride=1)
         if device != 'cpu':
             self.to(device)
 
@@ -31,7 +31,7 @@ class CNet(nn.Module):
         s2 = tu.conv_output_shape(s1, kernel_size=4, stride=1)
         s3 = tu.conv_output_shape(s2, kernel_size=4, stride=1)
         
-        self.output_shape = tu.as_shape(int(np.prod(s3) * 16))
+        self.output_shape = tu.as_shape(int(np.prod(s3) * 64))
     
     def to(self, device):
         self.device = device

@@ -247,6 +247,7 @@ class CMA:
         self.reset()
     
     def push(self, x):
+        self._x = x
         self._n += 1
         self._m = (x + (self._n-1) * self._m) / self._n
         
@@ -254,12 +255,19 @@ class CMA:
         assert(self._n > 0) # mean of no samples is undefined
         return self._m
     
+    def recent(self):
+        if len(self.labels) > 0:
+            return {self.labels[i]:self._x[i] for i in range(len(self.labels))} #get the most recent values that was pushed
+        else:
+            return self._x
+    
     def reset(self):
         if len(self.labels) > 0:
             self._m = np.zeros(len(self.labels))
         else:
             self._m = 0
         self._n = 0
+        self._x = None
         
     def labelled(self):
         return {self.labels[i]:self._m[i] for i in range(len(self.labels))}
@@ -381,14 +389,51 @@ def no_count(batch_iterator):
     for b in batch_iterator:
         yield b[1:]
 
-def batch_iterator(*data, batch_size=16, shuffle=False, circular=False):
+def batch_iterator(*data, batch_size=16, shuffle=False, count=True, circular=False):
+    
     if shuffle:
-        data = __shuffle__(*data)
-    if not circular:
-        return __batch_iterator__(*data, batch_size=batch_size)
+        data = shuffle(*data)
+    if count:
+        if not circular:   
+            if len(data) == 1:
+                return __batch_iterator_singular__(*data, batch_size=batch_size)
+            else:
+                return __batch_iterator__(*data, batch_size=batch_size)
+        else:
+            return __batch_iterator_circular__(*data, batch_size=batch_size)
     else:
-        return __batch_iterator_circular__(*data, batch_size=batch_size)
+        if not circular:
+            if len(data) == 1:
+                return __batch_iterator_singular_no_count__(*data, batch_size=batch_size)
+            else:
+                return __batch_iterator_no_count__(*data, batch_size=batch_size)
+        else:
+            raise NotImplementedError()
 
+def __batch_iterator_singular_no_count__(data, batch_size):
+    m = data.shape[0]
+    j = 0
+    for i in range(batch_size, m, batch_size):
+        yield data[j:i]
+        j = i
+    yield data[j:]
+
+def __batch_iterator_singular__(data, batch_size):
+    m = data.shape[0]
+    j = 0
+    for i in range(batch_size, m, batch_size):
+        yield i, data[j:i]
+        j = i
+    yield m, data[j:]    
+    
+def __batch_iterator_no_count__(*data, batch_size):
+    m = max(len(d) for d in data)
+    j = 0
+    for i in range(batch_size, m, batch_size):
+        yield tuple([d[j:i] for d in data])
+        j = i
+    yield tuple([d[j:] for d in data])
+    
 def __batch_iterator_circular__(*data, batch_size):
     i = 0
     m = max(len(d) for d in data)
@@ -405,17 +450,24 @@ def __batch_iterator__(*data, batch_size):
         j = i
     yield (m, *[d[j:] for d in data]) #01/10/2019 swap argument order! to match enumerate
         
-def __shuffle__(*data):
+def shuffle(*data):
     m = max(len(d) for d in data)
     indx = np.arange(m)
     np.random.shuffle(indx)
     data = [d[indx] for d in data]
     return data
 
-def collect(data, fun, unpack=True, batch_size=128):
-    iterator = no_count(batch_iterator(data, batch_size=batch_size))
-    z = pack_apply(iterator, fun, unpack)[0]
-    return np.concatenate(z)
+
+def collect(fun, *data, batch_size=128):
+    if len(data) == 1:
+        return np.concatenate(__collect_singular(fun, *data, batch_size=batch_size))
+    else:
+        raise NotImplementedError()
+        
+def __collect_singular(fun, data, batch_size=128):
+    iterator = apply(batch_iterator(data, batch_size=batch_size, count=False), fun, unpack=False)
+    result = [x for x in iterator]
+    return result
 
 def apply(iterable, fun, unpack=True):
     if unpack:
@@ -431,7 +483,7 @@ def pack_apply(iterable, fun, unpack=True):
 
 def pack(iterator):
     '''
-        Packs the content of an iterator into numpy array(s)
+        Packs the content of an iterator into numpy arrays
         Args:
             iterator: with which to iterate over and collect values
     '''
@@ -444,6 +496,7 @@ def pack(iterator):
             result[j].append(x[j])  
             
     return tuple([np.array(z) for z in result])
+
 
 def normalise(data):
     maxd = np.max(data)

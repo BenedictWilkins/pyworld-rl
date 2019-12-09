@@ -10,9 +10,6 @@ class Optimiser:
     
     def __init__(self, model):
         self.model = model
-        
-    def loss(self, *args):
-        pass
     
     def step(self, *args):
         pass

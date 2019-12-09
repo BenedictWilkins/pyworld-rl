@@ -11,9 +11,10 @@ import numpy as np
 from collections import namedtuple
 
 from pyworld.toolkit.tools.datautils import EMA, CMA
+from .Optimise import Optimiser
 
-from . import Optimise.Optimiser as Optimiser
- 
+
+
 class AE(Optimiser):
     
     lfun = namedtuple('loss', 'mse bce')(F.mse_loss, F.binary_cross_entropy_with_logits)
