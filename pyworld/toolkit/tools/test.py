@@ -10,15 +10,17 @@ import torch
 
 import pyworld.toolkit.tools.datautils as du
 import pyworld.toolkit.tools.torchutils as tu
+import pyworld.toolkit.tools.gymutils as gu
+import pyworld.environments
 
-fun = lambda x: x + 1
+env = gu.make('ObjectMover-v1')
 
-data1 = np.array([[0],[1],[2],[3],[4]])
-data2 =  np.array([[0],[1],[2],[3],[4]])
+class 
 
-print(du.collect(fun, data1, data2, batch_size=2))
+policy = gu.policy.uniform_random_policy(env.action_space)
 
-data1 = torch.FloatTensor(data1)
-data2 = torch.FloatTensor(data2)
+input_shape = env.observation_space.shape
+output_shape = 2
 
-print(tu.collect(fun, data1, data2, batch_size=2))
+#data = gu.episodes(env, policy, mode=gu.mode.ss, epochs=config['epochs']) #- doesnt work so well....? hmm
+data = gu.datasets(env, policy, mode=gu.mode.ss, size=10, epochs=10)

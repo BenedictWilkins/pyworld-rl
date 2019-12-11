@@ -464,7 +464,6 @@ def __HWC_show(name, array):
 
 def show(array, name='image', wait=60):
     __HWC_show(name, array)
-    print("SHOW")
     if wait >= 0:
         return cv2.waitKey(wait) == ord('q')
     return

@@ -17,7 +17,7 @@ class Counter(gym.Env):
         
     def step(self, action):
         self.i += 1 #self.actions[action]
-        return self.i, 0, False, None
+        return np.array([self.i]), 0, self.i > 5, None
         
     def reset(self):
         self.i = 0
@@ -31,15 +31,11 @@ class Counter(gym.Env):
 if __name__ == "__main__":
     import pyworld.toolkit.tools.gymutils as gu
     import pyworld.toolkit.tools.datautils as du
+    import numpy as np
+    
     env = Counter()
-    policy = gu.uniform_random_policy(env)
-    data_generator = gu.dynamic_dataset(env, policy, size=10, chunk=5, mode=gu.s)
-
-    for i, batch in du.batch_iterator(*next(data_generator), circular=True):
-        print(i, batch)
-        next(data_generator)
-        if i > 100:
-            break
-        
+    policy = gu.policy.uniform_random_policy(env.action_space)
+    dataset = gu.datasets(env, policy, size=10, mode=gu.mode.ss, epochs=3)
     
-    
+    for state, next_state in dataset:
+        print(np.concatenate((state, next_state), 1))    

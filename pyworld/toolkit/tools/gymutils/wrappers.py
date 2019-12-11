@@ -46,3 +46,23 @@ class ObservationWrapper(gym.ObservationWrapper):
         
     def observation(self, obs):
         return self.mode(obs)
+    
+class RewardWrapper(gym.Wrapper):
+    
+    def __init__(self, env, reward_fun):
+        super(RewardWrapper, self).__init__(env)
+        self.reward_fun = reward_fun
+        
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        return observation, self.reward_fun(observation, action, reward), done, info
+    
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+        
+        
+        
+        
+        
+        
+        

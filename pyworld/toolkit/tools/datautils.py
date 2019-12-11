@@ -389,44 +389,49 @@ def no_count(batch_iterator):
     for b in batch_iterator:
         yield b[1:]
 
-def batch_iterator(*data, batch_size=16, shuffle=False, count=True, circular=False):
-    
-    if shuffle:
-        data = shuffle(*data)
-    if count:
-        if not circular:   
-            if len(data) == 1:
-                return __batch_iterator_singular__(*data, batch_size=batch_size)
-            else:
-                return __batch_iterator__(*data, batch_size=batch_size)
-        else:
-            return __batch_iterator_circular__(*data, batch_size=batch_size)
-    else:
-        if not circular:
-            if len(data) == 1:
-                return __batch_iterator_singular_no_count__(*data, batch_size=batch_size)
-            else:
-                return __batch_iterator_no_count__(*data, batch_size=batch_size)
-        else:
-            raise NotImplementedError()
+def __shuffle__(*data):
+    return shuffle(*data)
 
-def __batch_iterator_singular_no_count__(data, batch_size):
+def __count_wrapper__(iterator, singular=True):
+    i = 0 
+    if singular:
+        for d in iterator:
+            i += d.shape[0]
+            yield i, d
+    else:
+        for d in iterator:
+            i += d[0].shape[0]
+            yield (i, *d)
+
+def batch_iterator(*data, batch_size=64, shuffle=False, count=False): #, circular=False):
+    #refactor this... probably count should be a wrapper
+    if shuffle:
+        data = __shuffle__(*data)
+    singular = len(data) == 1
+    iterator = None
+
+    if singular:
+        iterator = __batch_iterator_singular__(*data, batch_size=batch_size)
+    else:
+        iterator = __batch_iterator__(*data, batch_size=batch_size)
+
+    #iterator = __batch_iterator_circular__(*data, batch_size=batch_size)
+    
+    if count:
+        iterator = __count_wrapper__(iterator, singular=singular)
+    
+    return iterator
+    
+
+def __batch_iterator_singular__(data, batch_size):
     m = data.shape[0]
     j = 0
     for i in range(batch_size, m, batch_size):
         yield data[j:i]
         j = i
     yield data[j:]
-
-def __batch_iterator_singular__(data, batch_size):
-    m = data.shape[0]
-    j = 0
-    for i in range(batch_size, m, batch_size):
-        yield i, data[j:i]
-        j = i
-    yield m, data[j:]    
-    
-def __batch_iterator_no_count__(*data, batch_size):
+   
+def __batch_iterator__(*data, batch_size):
     m = max(len(d) for d in data)
     j = 0
     for i in range(batch_size, m, batch_size):
@@ -434,21 +439,15 @@ def __batch_iterator_no_count__(*data, batch_size):
         j = i
     yield tuple([d[j:] for d in data])
     
+'''
 def __batch_iterator_circular__(*data, batch_size):
     i = 0
     m = max(len(d) for d in data)
     while True:
         indx = np.arange(i,i + batch_size) % m
         i += batch_size
-        yield (i, *[d[indx] for d in data])
-        
-def __batch_iterator__(*data, batch_size):
-    m = max(len(d) for d in data)
-    j = 0
-    for i in range(batch_size, m, batch_size):
-        yield (i, *[d[j:i] for d in data])
-        j = i
-    yield (m, *[d[j:] for d in data]) #01/10/2019 swap argument order! to match enumerate
+        yield (*[d[indx] for d in data])
+'''
         
 def shuffle(*data):
     m = max(len(d) for d in data)

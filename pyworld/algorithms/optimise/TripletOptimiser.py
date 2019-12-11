@@ -124,14 +124,18 @@ class PairTripletOptimiser(TripletOptimiser):
         xn = d # careful with the diagonal!
 
         if topk_n and self.k < xn.shape[0]:
-            xn[range(d.shape[0]), range(d.shape[1])] = float('inf') #hopefully this doesnt mess up autograd.....
+            print("topk_n?")
+            xn[range(d.shape[0]), range(d.shape[1])] = float('inf') #hopefully this doesnt mess up autograd...
             xn = self.topk2(d, self.k, large=False) #select the k best negative values for each anchor
+            print(xn.shape)
             xf = xp.unsqueeze(2) - xn #should only consist of only ||A-P|| - ||A-N||
         else:
             xf = xp.unsqueeze(2) - xn
             xf[:,range(d.shape[0]), range(d.shape[1])] = 0. #remove all ||A-P|| - ||A-P||
             
         xf = F.relu(xf + self.margin) 
+        
+        print(xf.shape)
         '''
         print(xn.shape)
         print(xp.shape)

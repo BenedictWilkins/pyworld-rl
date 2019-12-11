@@ -129,14 +129,12 @@ class GymIterator:
     
     def __next__(self):
         if self.episodic:
-            while True:
-                result, _ = next(self.__iterator)
-                return result
+            result, _ = next(self.__iterator)
+            return result
         else:
             try:
-                while True:
-                    result, done = next(self.__iterator)
-                    return result
+                result, done = next(self.__iterator)
+                return result
             except StopIteration:
                 self.reset()
                 result, done = next(self.__iterator)
