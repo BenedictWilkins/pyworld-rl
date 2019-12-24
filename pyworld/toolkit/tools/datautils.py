@@ -26,7 +26,7 @@ def exit_on(iterator, on):
 
 def invert(index, shape):
     '''
-        Get inverted index e.g. [1,3,4,5],10 -> [2,6,7,8,9]
+        Get inverted index e.g. [1,3,4,5], 10 -> [2,6,7,8,9]
         Args:
             index: to invert
             shape: of the full index array
@@ -69,12 +69,11 @@ def display_increments2(total):
         i += 1        
 
 def onehot(y, size=None):
-    leny = size
     if size is None:
-        leny = len(np.unique(y))
+        size = len(np.unique(y))
     y = y.reshape(y.shape[0])
-    print(leny, y)
-    r = np.zeros((y.shape[0], leny))
+    #print(leny, y)
+    r = np.zeros((y.shape[0], size))
     r[:, y] = 1.
     return r
 
@@ -357,8 +356,9 @@ def __init_dataset(iterator, size, template=None):
         assertion(not isinstance(template, tuple), 'template must be a tuple (may be singleton)')
         assertion(not len(template) == len(x), 'invalid template size')
         for i,t in enumerate(template):
-            assertion(not tuple(t.shape[1:]) == tuple(x[i].shape), 
-                      'template shape {0} and example shape {1} do not match at position {2}'.format(t.shape[1:], x[i].shape, i))
+            #print(tuple(t.shape[1:]), __shape__(x[i]))
+            assertion(not tuple(t.shape[1:]) == __shape__(x[i]), 
+                      'template shape {0} and example shape {1} do not match at position {2}'.format(t.shape[1:], __shape__(x[i]), i))
         result = template
         
     for j in range(len(x)):
@@ -476,11 +476,11 @@ def apply(iterable, fun, unpack=True):
         for i in iterable:
             yield fun(i)
             
-def pack_apply(iterable, fun, unpack=True):
+def pack_apply(iterable, fun, unpack=True): #TODO ????? 
     iterable = apply(iterable, fun, unpack)
     return pack(iterable)
 
-def pack(iterator):
+def pack(iterator): #????
     '''
         Packs the content of an iterator into numpy arrays
         Args:

@@ -6,6 +6,7 @@ Created on Wed Oct 30 11:22:57 2019
 @author: Benedict Wilkins
 """
 
-from . import mlp
+from . import MLP
+from . import CNet
 
-__all__ = ('mlp',)
+__all__ = ('MLP', 'CNet')

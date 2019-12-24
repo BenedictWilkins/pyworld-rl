@@ -10,7 +10,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-import pyworld.toolkit.tools.torchutils as tu
+from ..tools import torchutils as tu
 
 class CNet(nn.Module):
     
@@ -65,10 +65,3 @@ class CNet2(CNet):
         x_ = super(CNet2, self).forward(x_)
         y_ = self.output_activation(self.out_layer(x_))
         return y_
-        
-        
-        
-        
-        
-        
-        

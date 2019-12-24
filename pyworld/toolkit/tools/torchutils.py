@@ -20,7 +20,6 @@ def as_shape(shape):
     else:
         raise ValueError("Invalid shape argument: {0}".format(str(shape)))
 
-
 def collect(fun, *data, batch_size=128):
     if len(data) == 1:
         return torch.cat(du.__collect_singular(fun, *data, batch_size=batch_size), 0)

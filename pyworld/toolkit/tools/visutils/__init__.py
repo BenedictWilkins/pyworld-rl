@@ -20,64 +20,31 @@ import os
 
 
 
-from . import fileutils as fu
-from . import datautils as du
+from .. import fileutils as fu
+from .. import datautils as du
 
-class HeatmapAnimation:
-    
-    def __init__(self, update, interval=10):
-        self.grid = None
-        self.update = update
-        self.interval = interval
-        self.fig = None
-        #self.stop_interactive = False
-        
-    # function to update figure
-    def __update__(self, *args):
-        print("update", args)
-        # set the data in the axesimage object
-        self.grid = self.update(self.grid)
-        self.im.set_array(self.grid)
-        # return the artists set
-        return self.im,
-    
-    def show(self, grid, vmin=0., vmax=1.):
-        self.grid = grid
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(111)
-        self.im = plt.imshow(grid, vmin=vmin, vmax=vmax)
-        
-        self.ani = FuncAnimation(self.fig, self.__update__, interval=self.interval)
-        plt.show()
-    
-    '''
-    def interactive(self, grid):
-        self.grid = grid
-        plt.ion()
-        self.fig = plt.figure()
-        self.fig.canvas.mpl_connect('close_event', self.handle_close)
-        self.ax = self.fig.add_subplot(111)
-        self.data = self.ax.imshow(self.grid)
-        #(self.grid)
-        
-    def interactive_update(self, *args):
-        print("update...")
-        if not self.stop_interactive:
-            self.grid = self.update(self.grid, *args)
-            self.ax.clear()
-            
-            self.data = self.ax.imshow(self.grid)
-            plt.draw()
-            #plt.pause(0.001)
-            #show(self.grid)
-    ''' 
-    
-    
-    def handle_close(self, evt):
-        plt.close(self.fig)
-        self.stop_interactive = True
+from . import transform
+from . import animation
 
+try:
+    import moviepy.editor as mpy
+except:
+    mpy = None
 
+__all__ = ('transform', 'animation')
+
+def savevideo(iterator, path, extension = ".mp4", fps=30):
+    if mpy is not None:
+        clip = mpy.ImageSequenceClip(iterator, fps=fps)
+        
+        if not fu.has_extension(path):
+            path = path + extension
+        path = fu.file(path)
+        
+        clip.write_videofile(path) # default codec: 'libx264', 24 fps
+    else:
+        raise ImportError('saving a video requires the module \'moviepy\'.')
+    
 class track2D:
     
     def __init__(self, figure, x, z):
@@ -119,7 +86,6 @@ def umap(x, y=None, **kwargs):
     
     return embedding, fig
 
-
 def matplot_close(fig='all'):
     plt.close(fig)
 
@@ -130,10 +96,10 @@ def matplot_deactivate():
     matplotlib.use('Agg')
 
 def matplot_isopen():
-    return plt.get_fignums()
+    return bool(plt.get_fignums())
 
 def matplot_isclosed():
-    return not plt.get_fignums()
+    return not matplot_isopen()
 
 class plt_events(Enum):
     press = 'button_press_event' 
@@ -151,7 +117,6 @@ class plt_events(Enum):
     exit_axes = 'axes_leave_event'
 
 def listen(figure, event, listener):
-    print(event)
     figure.canvas.mpl_connect(event.value, listener)
 
 def savefig(fig, path, extension = ".png"):
@@ -170,103 +135,14 @@ def figtoimage(fig):
     buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     return buf.reshape((h, w, 3))
     
-def savevideo(iterator, path, extension = ".mp4", fps=30):
-    import moviepy.editor as mpy
-    clip = mpy.ImageSequenceClip(iterator, fps=fps)
-    
-    if not fu.has_extension(path):
-        path = path + extension
-    path = fu.file(path)
-    
-    clip.write_videofile(path) # default codec: 'libx264', 24 fps
-    
 def save(image, path, extension = ".png"):
     image = du.normalise(image)
     if not fu.has_extension(path):
         path = path + extension
     path = fu.file(path)
     print(path)
-    plt.imsave(path, colour(image))
+    plt.imsave(path, transform.colour(image))
 
-def resize_all(images, shape):
-    result = np.empty((images.shape[0], *shape, images.shape[3]))
-    for i in range(len(images)):
-        result[i] = cv2.resize(images[i], shape)[:,:,np.newaxis]
-    return result
-
-def crop(image, shape):
-    cv2.crop
-
-def resize(image, shape, interpolation=cv2.INTER_NEAREST):
-    return cv2.resize(image, (shape[1], shape[0]), interpolation=interpolation)
-
-def scale(image, x, y):
-    return cv2.resize(image, None, fx=x, fy=y)
-
-def gray(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-def colour(image):
-    return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
-def CHW(data): #TORCH FORMAT
-    if len(data.shape) == 2:
-        return data[np.newaxis,:,:]
-    elif len(data.shape) == 3:    
-        return data.transpose((2,0,1))
-    elif len(data.shape) == 4:
-        return data.transpose((0,3,1,2))
-    else:
-        raise ValueError("invalid dimension: " + str(len(data.shape)))
-    
-def HWC(data): #CV2 FORMAT
-    if len(data.shape) == 2:
-        return data[:,:,np.newaxis]
-    if len(data.shape) == 3:    
-        return data.transpose((1,2,0))
-    elif len(data.shape) == 4:
-        return data.transpose((0,2,3,1))
-    else:
-        raise ValueError("invalid dimension: " + str(len(data.shape)))
-        
-        
-def channels_to_torch(data):
-    print("DEPRECATED USE CHW")
-    if len(data.shape) == 4:
-        return data.reshape((data.shape[0], data.shape[3], data.shape[1], data.shape[2]))
-    elif len(data.shape) == 3:
-        return data.reshape((data.shape[2], data.shape[0], data.shape[1]))
-
-def channels_to_cv(data):
-    print("DEPRECATED USE HWC")
-    if len(data.shape) == 4:
-        return data.reshape((data.shape[0], data.shape[2], data.shape[3], data.shape[1]))
-    elif len(data.shape) == 3:
-        return data.reshape((data.shape[1], data.shape[2], data.shape[0]))
-    
-def shape_to_torch(shape):
-    if len(shape) == 4:
-        return (shape[0], shape[3], shape[1], shape[2])
-    elif len(shape) == 3:
-        return (shape[2], shape[0], shape[1])
-
-def shape_to_cv(shape):
-    if len(shape) == 4:
-        return (shape[0], shape[2], shape[3], shape[1])
-    elif len(shape) == 3:
-        return (shape[1], shape[2], shape[0])
-
-'''
-def gallery(array, ncols=3):
-    nindex, height, width = array.shape
-    nrows = nindex//ncols
-    assert nindex == nrows*ncols
-    # want result.shape = (height*nrows, width*ncols, intensity)
-    result = (array.reshape(nrows, ncols, height, width)
-              .swapaxes(1,2)
-              .reshape(height*nrows, width*ncols))
-    return result
-'''
 def label_colours(labels, alpha=0.8):
     colours = cm.rainbow(np.linspace(0,1,len(labels)))
     colours[:,3] *= alpha
@@ -305,7 +181,17 @@ def __update_plot(title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, dr
         plt.draw()
         plt.pause(pause)
 
-def histogram2D(x, bins, fig=None, draw=True, clf=True, title=None, stacked=False, xlabel=None, ylabel=None, labels=None, colour=None, alpha=1., log=False):
+def histogram2D(x, bins, **kwargs): #for legacy reasons.. TODO remove
+    return histogram(x, bins, **kwargs)
+
+def histogram(x, bins, fig=None, draw=True, clf=True, title=None, stacked=False, xlabel=None, ylabel=None, labels=None, colour=None, alpha=1., log=False):
+    '''
+        Creates a histogram of the given data.
+        Arguments:
+            x: 1D array (or collection o)
+            bins: number of bins to use
+            # TODO
+    '''
     fig = __new_plot(fig, draw=draw, clf=clf)    
     plt.hist(x, bins, color=colour, alpha=alpha, log=log, label=labels, stacked=stacked)
     if labels:
@@ -376,8 +262,8 @@ def show_attention(values, queries, weights, embed_size=None, display_shape=(240
             lines2.append((incy * ((i // queries.shape[1]) + 1)+ incy2, incy * (( j // values.shape[1]) + 1) + + incy2))
 
     
-    embed = resize(embed.astype(np.float32), display_shape)
-    embed = colour(embed)
+    embed = transform.resize(embed.astype(np.float32), display_shape)
+    embed = transform.colour(embed)
     
     #construct video
 
@@ -396,7 +282,7 @@ def show_attention(values, queries, weights, embed_size=None, display_shape=(240
 
     play(frames, 'attention', wait=wait, repeat=True)
 
-def covariance(images, title=None, ):
+def covariance(images, title=None): #??
     print(images.shape)
     flattened = images.reshape(-1, np.prod(images[0].shape)).T
     covar = np.cov(flattened)
@@ -407,35 +293,99 @@ def covariance(images, title=None, ):
     plt.imshow(covar, cmap='viridis')
     
     
-def figure_to_numpy(fig):
+def figure_to_image(fig):
+    '''
+        Converts a figure into an image.
+        Arguments:
+            fig: the figure to convert
+    '''
     # draw the renderer
     fig.canvas.draw() 
     # Get the RGBA buffer from the figure
     w,h = fig.canvas.get_width_height() 
     return np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(h,w,3)  
     
-def gallery(array, ncols=3):
-    array = __HWC_format(array) 
+def gallery(images, cols=3):
+    '''
+        Creates a 2D gallery of images from a 1D array of images with a given number of columns.
+        Arguments:
+            images: an array of N images in HWC or CHW format
+            cols: number of columns in the image gallery
+    '''
+    array = __HWC_format(images) 
     nindex, height, width, intensity = array.shape    
-    nrows = nindex//ncols
+    nrows = nindex//cols
 
-    fill = abs(nindex - ((nrows + 1) * ncols))
+    fill = abs(nindex - ((nrows + 1) * cols))
     #print(ncols, nrows, fill, width, height)
     if fill:
         zeros = np.zeros((fill, height, width, intensity))
         #print(array.shape, zeros.shape)
         array = np.concatenate((array, zeros))
         nindex, height, width, intensity = array.shape    
-        nrows = nindex//ncols
+        nrows = nindex//cols
         
     #assert nindex == nrows*ncols
     # want result.shape = (height*nrows, width*ncols, intensity)
-    result = (array.reshape(nrows, ncols, height, width, intensity)
+    result = (array.reshape(nrows, cols, height, width, intensity)
               .swapaxes(1,2)
-              .reshape(height*nrows, width*ncols, intensity))
+              .reshape(height*nrows, width*cols, intensity))
     return result
 
-def __HWC_format(array):
+def show(image, name='image'):
+    '''
+        Shows the given image. See also wait() and close()
+    '''
+    __HWC_show(name, image)
+
+def play(video, name='video', wait=60, repeat=False, key='q'):
+    '''
+        Plays a video (a sequence or iterable of images).
+        Arguments:
+            video: an interable of images (frames)
+            name: name of the display window, default 'video'
+            wait: time to wait between each frame (ms), default 60
+            repeat: whether to repeat the video once the iterable has finished, default False
+            key: to press to close the video
+    '''
+    while True: 
+        for f in video:
+            __HWC_show(name, f)
+            if cv2.waitKey(wait) == ord(key):
+                close(name)
+                return
+        if not repeat:
+            close(name)
+            return
+
+def close(name=None):
+    '''
+        Closes the named window (or all windows if name is None).
+        Arguments:
+            name: of the window to close, default None
+    '''
+    if name is None: 
+        cv2.destroyAllWindows()
+    else:
+        cv2.destroyWindow(name)
+
+def wait(name=None, key='q'):
+    '''
+        Waits for the key (defualt 'q') to be pressed and then exits the 
+        named diplay window (or all open windows if name is None).
+        Arguments:
+            name: of the window to close, default None
+            key: to press to close the window(s)
+    '''
+    while cv2.waitKey(120) != ord(key):
+        pass
+    close(name)
+
+# -----------------  -----------------  ----------------
+# -----------------  ----- USEFUL ----  ----------------
+# -----------------  -----------------  ----------------
+
+def __HWC_format(array): #transform to HWC format
     '''
         dim(array) == 2 transform to HWC format
         dim(array) == 3 transform to HWC format
@@ -456,55 +406,8 @@ def __HWC_format(array):
     if array.shape[hwc] == 1 or array.shape[hwc] == 3 or array.shape[hwc] == 4:
         return array
     elif array.shape[chw] == 1 or array.shape[chw] == 3 or array.shape[chw] == 4:
-        return HWC(array)    
+        return transform.HWC(array)    
 
-def __HWC_show(name, array):
+def __HWC_show(name, array, size=None): #show with HWC transform
     array = __HWC_format(array)
     cv2.imshow(name, array)
-
-def show(array, name='image', wait=60):
-    __HWC_show(name, array)
-    if wait >= 0:
-        return cv2.waitKey(wait) == ord('q')
-    return
-
-def play(video, name='video', wait=60, repeat=False):
-    while True: 
-        for f in video:
-            __HWC_show(name, f)
-            if cv2.waitKey(wait) == ord('q'):
-                close(name)
-                return
-        if not repeat:
-            close(name)
-            return
-    
-
-def close(name=None):
-    if name is None: 
-        cv2.destroyAllWindows()
-    else:
-        cv2.destroyWindow(name)
-        
-def waitclose(wait=60):
-    if cv2.waitKey(wait) == ord('q'):
-        close()
-        return True
-    return False
-
-class __images:
-    
-    def character(self, char):
-        W = H = 14
-        img = Image.new('RGB', (W,H), color = (0,0,0)) #(0,0,0))
-        draw = ImageDraw.Draw(img)
-        font = ImageFont.truetype(os.path.dirname(__file__) + "/ArialCE.ttf", 18)
-
-        w,h = font.getsize(char)
-        draw.text(((W-w)/2,(H-h)/2 - 2), char, font=font, fill=(255,255,255)) #dont ask...        
-        return CHW(gray(np.array(img)) / 255.)
-
-
-
-
-images = __images()

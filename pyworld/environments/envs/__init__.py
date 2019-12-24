@@ -7,5 +7,7 @@ author: Benedict Wilkins
 """
 
 from . import objectmover
+from . import pygame
 
-__all__ = ('objectmover',)
+__all__ = ('objectmover', 'pygame')
+

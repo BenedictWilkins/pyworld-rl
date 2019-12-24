@@ -6,8 +6,11 @@ Created on Thu Oct 17 10:04:12 2019
 @author: ben
 """
 import time
-
-
+import traceback
+            
+def print_stack_trace():
+    print("\n".join([line.strip() for line in traceback.format_stack()]))
+        
 class __assertion:
     
     def __init__(self):
@@ -20,6 +23,17 @@ class __assertion:
             raise error
         
 assertion = __assertion()
+
+def should_continue():
+    yes =  ['y','yes']
+    no =  ['n','no']
+    print("continue? (y/n)")
+    inp = input()
+    while inp not in yes + no:
+        print("continue? (y/n)")
+        inp = input()
+    return inp in yes
+   
 
 class Sleep:
     

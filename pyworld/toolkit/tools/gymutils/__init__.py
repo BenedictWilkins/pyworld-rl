@@ -21,7 +21,8 @@ from . import mode
 
 __all__ = ('iterators', 'policy', 'wrappers', 'transformation', 'mode')
 
-no_transform  = ['ObjectMover-v0', 'ObjectMover-v1']
+no_transform  = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 'CoinCollector-Easy-v0',
+                 'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
 
 def make(name = 'Pong-v0', binary=None, stack=None):
     '''
@@ -34,6 +35,7 @@ def make(name = 'Pong-v0', binary=None, stack=None):
             a gym environment
     '''
     env = gym.make(name) #'PongNoFrameskip-v4')
+
     if name in no_transform:
         return env
     
@@ -42,7 +44,9 @@ def make(name = 'Pong-v0', binary=None, stack=None):
     if binary is not None:
         env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.binary, threshold=binary)
         
+    
     env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.chw)
+    
         
     if stack is not None and stack > 1:
         env = wrappers.ObservationWrapper(env, wrappers.ObservationWrapper.mode.stack, stack=stack)
@@ -101,17 +105,24 @@ def datasets(env, policy=None, mode=mode.s, size=1000, onehot=False, epochs=1):
         
         yield template
   
-def episode(env, policy=None, mode=mode.s, onehot=False):
+def episode(env, policy=None, mode=mode.s, onehot=False, max_episode_size=10000):
+    env.reset()
     assert mode in iterators.iterators
     iterator = iterators.GymIterator(env, policy, mode, onehot=onehot, episodic = True)
+    #iterator = iterators.itertools.islice(iterator, 0, max_episode_size)
+    
     return mode(*du.pack(iterator))
 
 
-def episodes(env, policy=None, mode=mode.s, onehot=False, epochs=1):
+def episodes(env, policy=None, mode=mode.s, onehot=False, epochs=1, max_episode_size=10000):
+    env.reset()
     assert mode in iterators.iterators
     for i in range(epochs):
-         iterator = iterators.GymIterator(env, policy, mode, onehot=onehot, episodic = True)
-         yield mode(*du.pack(iterator))
+        env.reset() #maybe...
+        iterator = iterators.GymIterator(env, policy, mode, onehot=onehot, episodic = True)
+        #iterator = iterators.itertools.islice(iterator, 0, max_episode_size)
+        
+        yield mode(*du.pack(iterator))
 
 def returns(rewards, gamma=0.99):
     returns = np.zeros_like(rewards) #np.empty_like(rewards)

@@ -75,10 +75,10 @@ class SANet2(SANet):
         return self.output_activation(self.output_layer(x_))
     
     
-class SANet3(torch.Module):
+class SANet3(nn.Module): #TODO
     
     '''
-        Similar to SANet2, but an MLP (without convolutions) network that takes in a vectorised state of dimension state_shape = (M,),
+        Similar to SANet2, but an MLP network that takes in a vectorised state of dimension state_shape = (M,),
         and a 1-hot representation of a discrete action of dimension action_shape = (N,). 
     '''
     
@@ -99,4 +99,5 @@ class SANet3(torch.Module):
         
     def forward(self, sa):
         s, a = sa
+        raise NotImplementedError()
     

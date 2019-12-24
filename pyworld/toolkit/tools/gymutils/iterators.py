@@ -129,6 +129,7 @@ class GymIterator:
     
     def __next__(self):
         if self.episodic:
+            #print(self.episodic)
             result, _ = next(self.__iterator)
             return result
         else:

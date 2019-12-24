@@ -10,7 +10,13 @@ import pickle
 import datetime
 import json
 
+try:
+   import torch
+except:
+   pass
+
 import numpy as np
+
 
 def __load_mpz(path, max_size=100000):
     if os.path.isfile(path):
@@ -40,9 +46,15 @@ def __save_pickle(file, data):
     with open(file, 'wb') as fp:
         pickle.dump(data, fp)
 
+def __save_torch(file, model):
+   torch.save(model.state_dict(), file)
+   
+def __load_torch(file, model=None):
+   assert model is not None #must provide a template model when loading a pytorch model
+   model.load_state_dict(torch.load(file))
 
-__load = {'.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle}
-__save = {'.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle}
+__load = {'.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch}
+__save = {'.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch}
 
 def load(path, **kwargs):
     if has_extension(path):
@@ -55,7 +67,7 @@ def save(path, data, **kwargs):
        __save[ext](path, data, **kwargs)
     
 
-def file(file, force=False):
+def file(file):
     path, _ = os.path.split(file)
     if not os.path.exists(path):
         os.makedirs(path)
