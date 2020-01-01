@@ -11,66 +11,63 @@ import numpy as np
 from collections import namedtuple
 
 from pyworld.toolkit.tools.datautils import EMA, CMA
-from .Optimise import Optimiser
+from .Optimise import Optimiser, TorchOptimiser
 
-
-
-class AE(Optimiser):
+class AEOptimiser(TorchOptimiser):
     
-    lfun = namedtuple('loss', 'mse bce')(F.mse_loss, F.binary_cross_entropy_with_logits)
-    
-    def __init__(self, ae, loss, lr=0.0005, ema_n = 100):
-        super(AE, self).__init__(ae)
-        self.cma = CMA('loss')
-        self.optim = torch.optim.Adam(ae.parameters(), lr=lr)
-        self._loss = loss
-        
+    def __init__(self, ae, loss=F.binary_cross_entropy_with_logits, lr=0.0005):
+        super(AEOptimiser, self).__init__(ae, base_optimiser=torch.optim.Adam(ae.parameters(), lr=lr))
+        self.__loss = loss
+        self.cma = CMA(loss.__name__)
+       
     def step(self, x):
-        self.optim.zero_grad()
-        loss = self.loss(x.to(self.model.device), *self.model(x))
+        loss = self.__loss(self.model(x), x.to(self.model.device))
         self.cma.push(loss.item())
-        loss.backward()
-        self.optim.step()
-        
-    def loss(self, x_target, x):
-        return self._loss(x, x_target)
-    
-    def info(self):
-        return {'model':type(self.model).__name__, 'loss': self._loss.__name__, 'optimiser':str(self.optim)}
+        return loss
 
-    
-class VAE(Optimiser):
-    
-    lfun = namedtuple('loss', 'mse bce')(F.mse_loss, F.binary_cross_entropy_with_logits)
-    
+class VAEOptimiser(TorchOptimiser):
+
     def __init__(self, vae, loss, beta=1., lr=0.0005):
-        super(VAE, self).__init__(vae)
-        self.cma = CMA('loss', 'kld_loss', loss.__name__)
-        self.optim = torch.optim.Adam(vae.parameters(), lr=lr)
+        super(VAEOptimiser, self).__init__(vae, base_optimiser=torch.optim.Adam(vae.parameters(), lr=lr))
+
         self.beta = beta
-        self._loss = loss
-        
-    def loss(self, x, mu_z, logvar_z, x_target):
-        x_target = x_target.to(self.model.device)
+        self.__loss = loss
+        self.cma = CMA('total_loss', loss.__name__, 'kld_loss')
+
+    def step(self, x):
+        x, mu_z, logvar_z = self.model(x)
+        x_target = x.to(self.model.device)
         kld_loss = self.beta * -0.5 * (1. + logvar_z - mu_z.pow(2) - logvar_z.exp()).sum()#.view(batch_size, -1).mean()
-        return kld_loss, self._loss(x, x_target, reduction="sum")
-    
-    def step(self, *args):        
-        self.optim.zero_grad()
-        kld, lss = self.loss(*self.model(*args[0:-1]), args[-1])
-        loss = kld + lss
-        self.cma.push(np.array([loss.item(), kld.item(), lss.item()]))
-        loss.backward()
-        self.optim.step()
-        return loss.item()
-        
-    def info(self):
-        return {'model':type(self.model).__name__, 'loss': self._loss.__name__, 'optimiser':str(self.optim), 'beta':self.beta}
+        x_loss = self.__loss(x, x_target)
+        loss = x_loss + kld_loss
+        self.cma.push(loss.item(), kld_loss.item(), x_loss.item())
+        return loss
 
-class WAAE(Optimiser):
-    pass
-    
+class DAEOptimiser(TorchOptimiser):
 
+    def noise_gaussian(x, p = 0.3):
+        return x + np.random.randn(*x.shape)
+    
+    def noise_pepper(x, p = 0.3):
+        return x * (np.random.uniform(size=x.shape) > p)
+
+    def noise_saltpepper(x, p = 0.3):
+        i = np.random.uniform(size=x.shape) < p
+        x[i] = (np.random.uniform(size=np.sum(i)) > 0.5)
+        return x
+
+    def __init__(self, ae, loss, noise_source = noise_gaussian, lr=0.0005):
+        super(DAEOptimiser, self).__init__(ae, base_optimiser=torch.optim.Adam(ae.parameters(), lr=lr))
+        self.__loss = loss
+        self.cma = CMA(loss.__name__)
+       
+    def step(self, x):
+        loss = self.__loss(self.model(x), x.to(self.model.device))
+        self.cma.push(loss.item())
+        return loss
+
+
+'''
 class AAE(Optimiser):
     
     def __init__(self, aae, lr=3e-4, lr_disc=3e-6, beta = 0.5, logits=True):
@@ -187,4 +184,4 @@ class VAEGAN(Optimiser):
             self.model.disc.zero_grad()
             gan.backward()
             self.optim_disc.step()
-            
+'''          

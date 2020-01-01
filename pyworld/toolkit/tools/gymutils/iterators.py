@@ -37,6 +37,7 @@ def sa_iterator(env, policy):
         nstate, _, done, _ = env.step(action)
         yield m.sa(state, action), done
         state = nstate
+    yield m.sa(state, policy(state))
         
 def sr_iterator(env, policy):
     state = env.reset()
@@ -46,6 +47,7 @@ def sr_iterator(env, policy):
         nstate, reward, done, _ = env.step(action)
         yield m.sr(state, reward), done
         state = nstate
+    yield m.sr(state, 0.) #?? maybe..
         
         
 def ss_iterator(env, policy):

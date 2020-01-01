@@ -10,7 +10,55 @@ import numpy as np
 
 from . import transformation
 
-class ResetEnvWrapper(gym.Wrapper):
+from ..fileutils import save as fu_save
+
+class EpisodeRecordWrapper(gym.Wrapper):
+
+    def __init__(self, env, path, compress=True):
+        super(EpisodeRecordWrapper, self).__init__(env)
+        self.states = []
+        self.actions = []
+        self.rewards = []
+
+        self.state_t = None
+        self.reward_t = None
+
+        self.path = path
+
+        self.already_done = False
+
+    def step(self, action_t):
+        assert not self.already_done #dont save multiple times just because someone isnt calling reset!
+         
+        state, reward, done, info = self.env.step(action_t)
+        self.states.append(self.state_t)
+        self.actions.append(action_t)
+        self.rewards.append(self.reward_t)
+
+        self.state_t = state
+        self.reward_t = reward
+
+        if done:
+            self.states.append(self.state_t)
+            self.actions.append(np.nan)
+            self.rewards.append(self.reward_t)
+
+            fu_save(self.path, {"state":self.states,"action":self.actions,"reward":self.rewards}, overwrite=False, force=True)
+
+            self.states.clear()
+            self.actions.clear()
+            self.rewards.clear()
+            self.already_done = True
+        
+        return state, reward, done, info
+
+    def reset(self, **kwargs):
+        self.state_t = self.env.reset(**kwargs)
+        self.reward_t = 0.
+        self.already_done = False
+        return self.state_t
+
+class ResetEnvWrapper(gym.Wrapper): #TODO refactor
     
     def __init__(self, env_name, env_snapshot):
         super(ResetEnvWrapper, self).__init__(gym.make(env_name))

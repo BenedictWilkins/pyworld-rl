@@ -35,7 +35,7 @@ def translate(image, x, y):
     return cv2.warpAffine(image, M, (image.shape[0], image.shape[1]))
 
 def rotate(image, theta, point=(0,0)):
-    M = cv2.getRotationMatrix2D(point,theta, 1)
+    M = cv2.getRotationMatrix2D((point[1], point[0]), theta, 1)
     return cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))
 
 def affine(image, p1, p2):
@@ -55,6 +55,9 @@ def colour(image):
     return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
 def CHW(image): #TORCH FORMAT
+    '''
+        Converts an image (or collection of images) from HWC to CHW format.
+    '''
     if len(image.shape) == 2:
         return image[np.newaxis,:,:]
     elif len(image.shape) == 3:    
@@ -65,6 +68,9 @@ def CHW(image): #TORCH FORMAT
         raise ValueError("invalid dimension: " + str(len(image.shape)))
     
 def HWC(image): #CV2 FORMAT
+    '''
+        Converts an image (or collection of images) from CHW to HWC format.
+    '''
     if len(image.shape) == 2:
         return image[:,:,np.newaxis]
     if len(image.shape) == 3:    

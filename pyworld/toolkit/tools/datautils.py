@@ -245,7 +245,8 @@ class CMA:
         self.labels = labels
         self.reset()
     
-    def push(self, x):
+    def push(self, *x):
+        x = np.array(x)
         self._x = x
         self._n += 1
         self._m = (x + (self._n-1) * self._m) / self._n

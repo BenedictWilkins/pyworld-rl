@@ -78,62 +78,30 @@ def device(display=True):
         print("USING DEVICE:", device)
     return device
 
-def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+def conv_output_shape(input_shape, channels, kernel_size=1, stride=1, pad=0, dilation=1):
+    '''
+        Get the output shape of a convolution given the input_shape.
+        Arguments:
+            input_shape: in CHW (or HW) format
+            TODO
+    '''
     from math import floor
+    h_w = input_shape[-2:]
+
     if type(kernel_size) is not tuple:
         kernel_size = (kernel_size, kernel_size)
     h = floor( ((h_w[0] + (2 * pad) - ( dilation * (kernel_size[0] - 1) ) - 1 )/ stride) + 1)
     w = floor( ((h_w[1] + (2 * pad) - ( dilation * (kernel_size[1] - 1) ) - 1 )/ stride) + 1)
-    return h, w
-
-class __inverse:
-    
-    def not_implemented(*args):
-        raise NotImplementedError
-        
-    def convtranspose2d(layer, share_weights):
-        convt2d = nn.ConvTranspose2d(layer.out_channels, layer.in_channels, 
-                           kernel_size=layer.kernel_size, 
-                           stride=layer.stride, 
-                           padding=layer.padding)
-        if share_weights:
-            convt2d.weight = layer.weight
-        return convt2d
-    
-    def lineartranspose(layer, share_weights):
-        lt = nn.Linear(layer.out_features, layer.in_features, layer.bias is not None)
-        if share_weights:
-            lt.weight = nn.Parameter(layer.weight.t())
-        return lt
-    
-    il = {
-          nn.Conv1d: not_implemented,
-          nn.Conv2d: convtranspose2d,
-          nn.Conv3d: not_implemented,
-          nn.Linear: lineartranspose
-         }
-
-def construct_inverse(*layers, share_weights = True):
-    inverse_layers = []
-    for layer in reversed(layers):
-        inverse_layers.append(__inverse.il[type(layer)](layer, share_weights))
-    return inverse_layers
+    return channels, h, w
 
 def default_conv2d(input_shape):    
     assert len(input_shape) == 2
     s1 = conv_output_shape(input_shape, kernel_size=4, stride=2)
-    s2 = conv_output_shape(s1, kernel_size=4, stride=1)
-    s3 = conv_output_shape(s2, kernel_size=4, stride=1)
+    s2 = conv_output_shape(s1, kernel_size=3, stride=1)
+    s3 = conv_output_shape(s2, kernel_size=3, stride=1)
     
-    layers = [nn.Conv2d(1, 64, kernel_size=4, stride=2),
-              nn.Conv2d(64, 32, kernel_size=4, stride=1),
-              nn.Conv2d(32, 16, kernel_size=4, stride=1)]
+    layers = [nn.Conv2d(1, 16, kernel_size=4, stride=2),
+              nn.Conv2d(16, 32, kernel_size=3, stride=1),
+              nn.Conv2d(32, 64, kernel_size=3, stride=1)]
     
     return layers, [s1, s2, s3]
-
-
-if __name__ == "__main__":
-    print(as_shape(1))
-    print(as_shape((1,1)))
-    print(as_shape(np.array([1,2,3]).shape))
-    print(as_shape(torch.FloatTensor(np.array([1,2,3])).shape))

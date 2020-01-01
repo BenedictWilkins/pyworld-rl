@@ -24,6 +24,9 @@ __all__ = ('iterators', 'policy', 'wrappers', 'transformation', 'mode')
 no_transform  = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 'CoinCollector-Easy-v0',
                  'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
 
+def name(env):
+    return env.unwrapped.spec.id
+
 def make(name = 'Pong-v0', binary=None, stack=None):
     '''
         Creates pre-wrapped environments from gym. The state space is reduce to (H,W,C) format - (84,84,1). The action space is unchanged.

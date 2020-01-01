@@ -25,26 +25,29 @@ from .. import datautils as du
 
 from . import transform
 from . import animation
+from . import detection
 
 try:
     import moviepy.editor as mpy
 except:
     mpy = None
 
-__all__ = ('transform', 'animation')
+__all__ = ('transform', 'animation', 'detection')
 
 def savevideo(iterator, path, extension = ".mp4", fps=30):
     if mpy is not None:
-        clip = mpy.ImageSequenceClip(iterator, fps=fps)
+        sequence = [x for x in iterator] #sigh...
+        clip = mpy.ImageSequenceClip(sequence, fps=fps)
         
         if not fu.has_extension(path):
             path = path + extension
         path = fu.file(path)
-        
-        clip.write_videofile(path) # default codec: 'libx264', 24 fps
+        clip.write_gif(path)
+
+        #clip.write_videofile(path) # default codec: 'libx264', 24 fps
     else:
         raise ImportError('saving a video requires the module \'moviepy\'.')
-    
+
 class track2D:
     
     def __init__(self, figure, x, z):
@@ -135,10 +138,10 @@ def figtoimage(fig):
     buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     return buf.reshape((h, w, 3))
     
-def save(image, path, extension = ".png"):
+def save(image, path,):
     image = du.normalise(image)
     if not fu.has_extension(path):
-        path = path + extension
+        path = path + ".png"
     path = fu.file(path)
     print(path)
     plt.imsave(path, transform.colour(image))
@@ -332,13 +335,16 @@ def gallery(images, cols=3):
               .reshape(height*nrows, width*cols, intensity))
     return result
 
+__cv_window_handles = []
+
 def show(image, name='image'):
     '''
         Shows the given image. See also wait() and close()
     '''
     __HWC_show(name, image)
 
-def play(video, name='video', wait=60, repeat=False, key='q'):
+
+def play(video, name='video', wait=60, repeat=False, key='q'): #TODO fix repeat... (it relies on the iterator)
     '''
         Plays a video (a sequence or iterable of images).
         Arguments:
@@ -348,6 +354,7 @@ def play(video, name='video', wait=60, repeat=False, key='q'):
             repeat: whether to repeat the video once the iterable has finished, default False
             key: to press to close the video
     '''
+    __cv_window_handles.append(video)
     while True: 
         for f in video:
             __HWC_show(name, f)
