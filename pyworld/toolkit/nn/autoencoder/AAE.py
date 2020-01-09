@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from . import AE
-import pyworld.toolkit.tools.torchutils as tu
+from ...tools import torchutils as tu
 
 def prior_gaussian(size, device='cpu'):
     return torch.as_tensor(np.random.randn(*size), device=device, dtype=torch.float)

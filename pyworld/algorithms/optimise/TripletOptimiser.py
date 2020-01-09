@@ -16,15 +16,18 @@ from collections import namedtuple
 import pyworld.toolkit.tools.datautils as du
 import pyworld.toolkit.tools.torchutils as tu
 
+from pyworld.toolkit.tools.datautils.accumulate import CMA
+
 if __name__ != "__main__":
-    from .Optimise import Optimiser
+    from .Optimise import TorchOptimiser
 else:
-    from Optimise import Optimiser
+    from Optimise import TorchOptimiser
     
+#TODO most of the self.loss computation of each optimiser should be moved into self.step
 
 mode = namedtuple('mode', 'all top top_n, top_p')(0,1,2,3)  #enum?
 
-class TripletOptimiser(Optimiser):
+class TripletOptimiser(TorchOptimiser):
          
     def __init__(self, model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005):
         super(TripletOptimiser, self).__init__(model)
@@ -33,16 +36,16 @@ class TripletOptimiser(Optimiser):
         self.k = int(k) #should be related to the batch size or number of p/n examples expected
         
         self.optim = torch.optim.Adam(self.model.parameters(), lr=lr)
-        self.cma = du.CMA('loss')
+        self.cma = CMA('loss')
         self.margin = margin
     
     def step(self, x, y):
-        self.optim.zero_grad()
+        #self.optim.zero_grad()
         loss = self.loss(x, y.squeeze(), *self.__top[self.mode])
         self.cma.push(loss.item())
-        loss.backward()
-        self.optim.step()
-        return loss.item()
+        #loss.backward()
+        #self.optim.step()
+        return loss
         
     def loss(self, x, y, topk_n = False, topk_p = False):
         x_ = self.model(x)
@@ -75,7 +78,7 @@ class TripletOptimiser(Optimiser):
 
         return loss
         
-    def distance_matrix(self, x1, x2=None):
+    def distance_matrix(self, x1, x2=None): #L22 distance by default
         # TODO speed up...
         if x2 is None:
             x2 = x1
@@ -112,12 +115,12 @@ class PairTripletOptimiser(TripletOptimiser):
             Step with pairs of input. ``(x1_i, x2_i)`` are a pair - share the same label
             (x1_i, x2_{j\neq i}) are considered to have different labels (i.e. are not a pair).
         '''
-        self.optim.zero_grad()
+        #self.optim.zero_grad()
         loss = self.loss(x1, x2, *self._TripletOptimiser__top[self.mode])
         self.cma.push(loss.item())
-        loss.backward()
-        self.optim.step()
-        return loss.item()
+        #loss.backward()
+        #self.optim.step()
+        return loss
     
     def loss(self, x1, x2, topk_n = False, topk_p = False):
         
@@ -129,29 +132,34 @@ class PairTripletOptimiser(TripletOptimiser):
         xn = d # careful with the diagonal!
 
         if topk_n and self.k < xn.shape[0]:
-            #print("topk_n?")
+            #remove xp - xn = 0, along  
             xn[range(d.shape[0]), range(d.shape[1])] = float('inf') #hopefully this doesnt mess up autograd...
             xn = self.topk2(d, self.k, large=False) #select the k best negative values for each anchor [batch_size x k]
-            #print(xn.shape)
-        xf = xp.unsqueeze(2) - xn #should only consist of only ||A-P|| - ||A-N|| [batch_size x batch_size x k]
+
+        # is doesnt matter if xp is included in xn as xp_i - xn_i = 0, the original inequality is satisfied, the loss will be 0.
+        # it may be more expensive to remove these values than to just compute as below.
+        xf = xp.unsqueeze(2) - xn #should only consist of only ||A - P|| - ||A - N|| [batch_size x batch_size x k]
         
         #else: this is probably not needed...?
-            #xf = xp.unsqueeze(2) - xn
             #xf[:,range(d.shape[0]), range(d.shape[1])] = 0. #remove all ||A-P|| - ||A-P|| #todo
             
         xf = F.relu(xf + self.margin) 
-        
-        #print(xf.shape)
-        '''
-        print(xn.shape)
-        print(xp.shape)
-        print(xn)
-        print(xp)
-        print(xf)
-        print(xf.sum())
-        '''
         return xf.sum()
-    
+
+class SSTripletOptimiser(PairTripletOptimiser):
+
+    def __init__(self, model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005):
+        super(PairTripletOptimiser, self).__init__(model, margin, mode, k, lr)
+
+    def state_state_distance(self, episode, batch_size=256):
+        self.model.eval()
+        z = tu.collect(self.model, episode, batch_size=batch_size) #how much memory has the gpu got?!
+        self.model.train()
+        #L22 distance by default? TODO give some other options for this
+        z1 = z[:-1]
+        z2 = z[1:]
+        return z, ((z1 - z2) ** 2).sum(1)
+
 class SASTripletOptimiser(TripletOptimiser):
     
     class __SAModel(torch.nn.Module):
@@ -190,13 +198,13 @@ class SASTripletOptimiser(TripletOptimiser):
         '''
            (s1_i, a_i, s2_i) are considered positive any other combination are negative 
            where a_i is taken from the set of possible actions.
-        '''
-        self.optim.zero_grad()
+        #'''
+        #self.optim.zero_grad()
         loss = self.loss(s1, a, s2, *self._TripletOptimiser__top[self.mode])
         self.cma.push(loss.item())
-        loss.backward()
-        self.optim.step()
-        return loss.item()
+        #loss.backward()
+        #self.optim.step()
+        return loss
     
     def loss(self, s1, a, s2, topk_n = False, topk_p = False):
         #encode each state, of course this can be done more efficiently in the specific case!
@@ -313,6 +321,9 @@ class SASTripletOptimiser(TripletOptimiser):
         x = torch.cat((x,a), 3) #SIGHHHH copying is the bane of my existence
 
         return x # N x N x |A| x M
+
+
+
 
 
 

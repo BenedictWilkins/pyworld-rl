@@ -21,6 +21,9 @@ from . import mode
 
 __all__ = ('iterators', 'policy', 'wrappers', 'transformation', 'mode')
 
+PYWORLD_ENVIRONMENTS = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 'CoinCollector-Easy-v0',
+                        'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
+
 no_transform  = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 'CoinCollector-Easy-v0',
                  'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
 

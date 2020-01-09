@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from . import AE
-import pyworld.toolkit.tools.torchutils as tu
+from ...tools import torchutils as tu
 
 class VAE(AE.AE):
     

@@ -8,5 +8,6 @@ Created on Wed Oct 30 11:22:57 2019
 
 from . import MLP
 from . import CNet
+from . import autoencoder
 
-__all__ = ('MLP', 'CNet')
+__all__ = ('MLP', 'CNet', "autoencoder")

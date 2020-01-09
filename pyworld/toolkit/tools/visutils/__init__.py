@@ -22,6 +22,7 @@ import os
 
 from .. import fileutils as fu
 from .. import datautils as du
+from .. import torchutils as tu
 
 from . import transform
 from . import animation
@@ -104,6 +105,12 @@ def matplot_isopen():
 def matplot_isclosed():
     return not matplot_isopen()
 
+def cv_isopen(name):
+    try:
+        return cv2.getWindowProperty(name, 0) != -1
+    except:
+        return False
+
 class plt_events(Enum):
     press = 'button_press_event' 
     release = 'button_release_event' 
@@ -136,7 +143,8 @@ def figtoimage(fig):
     # Get the RGBA buffer from the figure
     w,h = fig.canvas.get_width_height()
     buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    return buf.reshape((h, w, 3))
+
+    return np.flip(buf.reshape((h, w, 3)), 2) #bgr format for opencv!
     
 def save(image, path,):
     image = du.normalise(image)
@@ -206,7 +214,7 @@ def plot2D(model, x, y=None, fig=None, clf=True, marker=".", colour=None, alpha=
                   title=None, xlabel=None, ylabel=None, xlim=None, ylim=None, pause=0.001, draw = True):
     fig = __new_plot(fig, draw=draw, clf=clf)
     
-    z = du.collect(model, x)
+    z = tu.collect(model, x)
     
     assert z.shape[1] == 2 #...hmmmm
     
@@ -315,7 +323,9 @@ def gallery(images, cols=3):
             images: an array of N images in HWC or CHW format
             cols: number of columns in the image gallery
     '''
+    
     array = __HWC_format(images) 
+
     nindex, height, width, intensity = array.shape    
     nrows = nindex//cols
 
@@ -335,7 +345,6 @@ def gallery(images, cols=3):
               .reshape(height*nrows, width*cols, intensity))
     return result
 
-__cv_window_handles = []
 
 def show(image, name='image'):
     '''
@@ -354,7 +363,6 @@ def play(video, name='video', wait=60, repeat=False, key='q'): #TODO fix repeat.
             repeat: whether to repeat the video once the iterable has finished, default False
             key: to press to close the video
     '''
-    __cv_window_handles.append(video)
     while True: 
         for f in video:
             __HWC_show(name, f)
@@ -364,6 +372,7 @@ def play(video, name='video', wait=60, repeat=False, key='q'): #TODO fix repeat.
         if not repeat:
             close(name)
             return
+        
 
 def close(name=None):
     '''
@@ -398,6 +407,7 @@ def __HWC_format(array): #transform to HWC format
         dim(array) == 3 transform to HWC format
         dim(array) == 4 transform to BHWC format
     '''
+
     chw = 0
     hwc = 2
     if len(array.shape) == 3:
@@ -418,3 +428,4 @@ def __HWC_format(array): #transform to HWC format
 def __HWC_show(name, array, size=None): #show with HWC transform
     array = __HWC_format(array)
     cv2.imshow(name, array)
+    cv2.waitKey(60) #... so weird

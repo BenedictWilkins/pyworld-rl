@@ -8,9 +8,16 @@ Created on Mon May 20 16:53:40 2019
 import numpy as np
 import itertools
 
-from .debugutils import assertion
+from inspect import signature
+
+from ..debugutils import assertion
+
+from . import accumulate
 
 
+__all__ = ('accumulate',)
+
+''' #meh remove them...
 def arg(args, name, default):
     if name in args:
         return args[name]
@@ -23,6 +30,7 @@ def exit_on(iterator, on):
         yield x
         if on():
             return
+'''
 
 def invert(index, shape):
     '''
@@ -68,6 +76,12 @@ def display_increments2(total):
         yield j
         i += 1        
 
+def onehot(x, size, dtype=np.float32):
+    r = np.zeros((x.shape[0], size), dtype=dtype)
+    r[:, x.squeeze()] = 1
+    return r
+
+'''
 def onehot(y, size=None):
     if size is None:
         size = len(np.unique(y))
@@ -76,20 +90,22 @@ def onehot(y, size=None):
     r = np.zeros((y.shape[0], size))
     r[:, y] = 1.
     return r
+'''
 
-def onehot_int(y, size):
+
+def onehot_int(y, size): #deprecated... use onehot
     r = np.zeros((size))
     r[y] = 1
     return r
-    
+
 def mnist(normalise=True):
     import tensorflow as tf
     mnist = tf.keras.datasets.mnist
     
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    x_train = np.expand_dims(x_train, 1)
+    x_train = np.expand_dims(x_train, 1).astype(np.float32)
     y_train = np.expand_dims(y_train, 1) 
-    x_test = np.expand_dims(x_test, 1) 
+    x_test = np.expand_dims(x_test, 1).astype(np.float32)
     y_test = np.expand_dims(y_test, 1)
     if normalise:
         return x_train / 255.0, y_train, x_test / 255.0, y_test
@@ -101,212 +117,6 @@ def splitbylabel(x, y):
     for label in np.unique(y):
         result[label] = x[(y==label).squeeze()]
     return result
-
-
-    
-class MeanAccumulator:
-    
-    def __init__(self, n=float('inf')):
-        self._m = 0
-        self._n = 0
-        self._max_n = n
-        
-    def push(self, x):
-        self._n += 1
-        self._m = MeanAccumulator._moving_mean(self._m, x, min(self._n, self._max_n))
-        
-    def mean(self):
-        assert(self._n > 0) # mean of no samples is undefined
-        return self._m
-    
-    def _moving_mean(mean, x, n):
-        '''
-            Computes the mean in a single pass
-            Args:
-                mean: current mean
-                x: next value
-                n: number of values so far (including x)
-        '''
-        return (x + (n-1) * mean) / n
-    
-    def reset(self):
-        self._m = 0
-        self._n = 0
-    
-    def __str__(self):
-        return str(self.mean())
-    
-    def __repr__(self):
-        return MeanAccumulator.__name__ + '-' + str(self._m)
-
-class MeanAccumulator2:
-    
-     def __init__(self):
-        self._m = np.array([])
-        self._n = np.array([])
-        
-     def push(self, x):
-        self._m, self._n = MeanAccumulator2._variable_moving_mean(self._m, x, self._n)
-        
-     def mean(self):
-        return self._m
-    
-     def _variable_moving_mean(mean, x, n):
-        lx = len(x)
-        lm = len(mean)
-        if lx > lm:
-            n = np.append(n, [0]*(lx-lm))
-        n[:lx] += 1
-        mean[:lx] = MeanAccumulator._moving_mean(mean[:lx], x[:lm], n[:min(lx,lm)])
-        return np.concatenate((mean, x[lm:])), n    
-    
-class VarianceAccumulator:
-    
-    def __init__(self):
-        self._m = 0
-        self._s = 0
-        self._n = 0
-    
-    def push(self, x):
-        self._n += 1
-        self._m, self._s = VarianceAccumulator._moving_variance(self._m, self._s, x, self._n)
-    
-    def mean(self):
-        assert(self._n > 0) # mean of no samples is undefined
-        return self._m
-    
-    def variance(self):
-        assert(self._n > 1) # variance of a single sample is undefined
-        return self._s / self._n
-    
-    def sample_variance(self):
-        assert(self._n > 1) # variance of a single sample is undefined
-        return self._s / (self._n - 1)    
-    
-    def _moving_variance(M, S, x, n):
-        '''
-            Computes the variance in a single pass
-            Args:
-                M: mean
-                S: -
-                x: next value
-                n: number of values so far (including x)
-        '''
-        Mn = M + (x - M)/n 
-        S = S + (x-M)*(x-Mn)
-        return Mn, S 
-
-     
-class VarianceAccumulator2:
-    
-    def __init__(self):
-        self._m = np.array([])
-        self._s = np.array([])
-        self._n = np.array([])
-        self._nn = 0
-    
-    def push(self, x):
-        self._m, self._s, self._n, self._nn = VarianceAccumulator2._variable_moving_variance(self._m, self._s, x, self._n)
-        
-    def mean(self):
-        return self._m
-    
-    def variance(self):
-        return self._s[:self._nn] / self._n[:self._nn]
-    
-    def sample_variance(self):
-        return self._s[:self._nn] / (self._n[:self._nn] - 1)
-        
-    def standard_deviation(self):
-        return np.sqrt(self.variance())
-    
-    def _variable_moving_variance(M,S,x,n):
-        '''
-            Computes the variance in a single pass for variable size x
-            M: mean
-            S: -
-            x: next value (of varying size)
-            n: number of values so far (including x)
-        '''
-        lx = len(x)
-        lm = len(M)
-        if lx > lm:
-            a = [0]*(lx-lm)
-            n = np.append(n, a)
-        n[:lx] += 1
-        M[:lx], S[:lx] = VarianceAccumulator._moving_variance(M[:lx], S[:lx], x[:lm], n[:min(lx,lm)])
-        return np.concatenate((M, x[lm:])), np.concatenate((S, np.zeros(len(x[lm:])))), n, len(M)
-        
-    
-    
-class CMA:
-    
-    def __init__(self, *labels):
-        self.labels = labels
-        self.reset()
-    
-    def push(self, *x):
-        x = np.array(x)
-        self._x = x
-        self._n += 1
-        self._m = (x + (self._n-1) * self._m) / self._n
-        
-    def __call__(self):
-        assert(self._n > 0) # mean of no samples is undefined
-        return self._m
-    
-    def recent(self):
-        if len(self.labels) > 0:
-            return {self.labels[i]:self._x[i] for i in range(len(self.labels))} #get the most recent values that was pushed
-        else:
-            return self._x
-    
-    def reset(self):
-        if len(self.labels) > 0:
-            self._m = np.zeros(len(self.labels))
-        else:
-            self._m = 0
-        self._n = 0
-        self._x = None
-        
-    def labelled(self):
-        return {self.labels[i]:self._m[i] for i in range(len(self.labels))}
-    
-    def __str__(self):
-        if len(self.labels) > 0:
-            return str(self.labelled())
-        else:        
-            return str(self._m)
-    
-    def __repr__(self):
-        return CMA.__name__ + '-' + str(self)
-    
-class EMA:
-    
-    def __init__(self, n):
-        self._alpha = 2. / (n + 1.)
-        self.reset()
-        
-    def __push1(self, x):
-        self._m = x
-        self.push = self.__push
-
-    def __push(self, x):
-        self._m = self._alpha * x + (1-self._alpha) * self._m
-    
-    def __call__(self):
-        assert(self._m is not None) # mean of no samples is undefined
-        return self._m
-    
-    def reset(self):
-        self._m = 0
-        self.push = self.__push1
-    
-    def __str__(self):
-        return str(self._m)
-    
-    def __repr__(self):
-        return EMA.__name__ + '-' + str(self._m)
 
 
         
@@ -404,11 +214,11 @@ def __count_wrapper__(iterator, singular=True):
             i += d[0].shape[0]
             yield (i, *d)
 
-def batch_iterator(*data, batch_size=64, shuffle=False, count=False): #, circular=False):
+def batch_iterator(*data, batch_size=64, shuffle=False, count=False, force_nonsingular=False): #, circular=False):
     #refactor this... probably count should be a wrapper
     if shuffle:
         data = __shuffle__(*data)
-    singular = len(data) == 1
+    singular = (len(data) == 1 and not force_nonsingular)
     iterator = None
 
     if singular:
@@ -423,7 +233,6 @@ def batch_iterator(*data, batch_size=64, shuffle=False, count=False): #, circula
     
     return iterator
     
-
 def __batch_iterator_singular__(data, batch_size):
     m = data.shape[0]
     j = 0
@@ -450,26 +259,14 @@ def __batch_iterator_circular__(*data, batch_size):
         yield (*[d[indx] for d in data])
 '''
         
-def shuffle(*data):
+def shuffle(*data): #sad that this can be done in place...
     m = max(len(d) for d in data)
     indx = np.arange(m)
     np.random.shuffle(indx)
     data = [d[indx] for d in data]
     return data
 
-
-def collect(fun, *data, batch_size=128):
-    if len(data) == 1:
-        return np.concatenate(__collect_singular(fun, *data, batch_size=batch_size))
-    else:
-        raise NotImplementedError()
-        
-def __collect_singular(fun, data, batch_size=128):
-    iterator = apply(batch_iterator(data, batch_size=batch_size, count=False), fun, unpack=False)
-    result = [x for x in iterator]
-    return result
-
-def apply(iterable, fun, unpack=True):
+def apply(iterable, fun, unpack=True): ##????
     if unpack:
         for i in iterable:
             yield fun(*i)
@@ -502,8 +299,6 @@ def normalise(data):
     maxd = np.max(data)
     mind = np.min(data)
     return (data - mind) / (maxd - mind)
-
-
 
 def group_avg(x,y):
     unique = np.unique(x, axis=0)

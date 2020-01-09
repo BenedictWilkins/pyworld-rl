@@ -33,7 +33,6 @@ def should_continue():
         print("continue? (y/n)")
         inp = input()
     return inp in yes
-   
 
 class Sleep:
     

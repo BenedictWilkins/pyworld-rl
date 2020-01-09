@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import pyworld.toolkit.tools.torchutils as tu
+from ...tools import torchutils as tu
 from .inverse import inverse
 
 class AE(nn.Module):
@@ -37,14 +37,16 @@ class AE(nn.Module):
         z = self.encoder(x)
         return self.decoder(z)
 
+#=============== TODO just use CNet as default? ===================
+
 def default_conv2d(input_shape):    
     s1 = tu.conv_output_shape(input_shape, 16, kernel_size=4, stride=2)
-    s2 = tu.conv_output_shape(s1, 32, kernel_size=3, stride=1)
-    s3 = tu.conv_output_shape(s2, 64, kernel_size=3, stride=1)
+    s2 = tu.conv_output_shape(s1, 32, kernel_size=4, stride=1)
+    s3 = tu.conv_output_shape(s2, 64, kernel_size=4, stride=1)
     
-    layers = [nn.Conv2d(1, 16, kernel_size=4, stride=2),
-              nn.Conv2d(16, 32, kernel_size=3, stride=1),
-              nn.Conv2d(32, 64, kernel_size=3, stride=1)]
+    layers = [nn.Conv2d(input_shape[0], 16, kernel_size=4, stride=2),
+              nn.Conv2d(16, 32, kernel_size=4, stride=1),
+              nn.Conv2d(32, 64, kernel_size=4, stride=1)]
     
     return layers, [s1, s2, s3]
 
@@ -61,7 +63,6 @@ def default2D(input_shape, latent_shape, share_weights=True):
 
     layers, shapes = default_conv2d(input_shape)
     layers.append(nn.Linear(np.prod(shapes[-1]), latent_shape[0]))
-
     inverse_layers = inverse(*layers, share_weights=share_weights)
     
     class Encoder(nn.Module):
@@ -216,3 +217,4 @@ class Encoder(_LatentSeq):
     def __init__(self, *layers, latent_dim):
         super(Encoder, self).__init__(*layers, latent_dim=latent_dim)
 '''
+

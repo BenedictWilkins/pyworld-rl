@@ -32,6 +32,29 @@ try:
 except:
     pass
 
+try:
+    import yaml
+except:
+    pass
+
+def __save_yaml(path, data):
+    with open(path) as file:
+        yaml.dump(data, file)
+
+def __load_yaml(path):
+    with open(path) as file:
+        data = yaml.full_load(file)
+    return data
+
+def __save_json(f, obj):
+    with open(f, 'w') as fp:
+        json.dump(obj, fp)
+
+def __load_json(f):
+    with open(f, 'r') as fp:
+        data = json.load(fp)
+    return data
+
 def __load_mpz(path, max_size=100000):
     if os.path.isfile(path):
         data = np.load(path)
@@ -61,12 +84,12 @@ def __save_pickle(file, data):
         pickle.dump(data, fp)
 
 def __save_torch(file, model):
-   torch.save(model.state_dict(), file)
+    torch.save(model.state_dict(), file)
    
 def __load_torch(file, model=None):
-   assert model is not None #must provide a template model when loading a pytorch model
-   model.load_state_dict(torch.load(file))
-
+    assert model is not None #must provide a template model when loading a pytorch model
+    model.load_state_dict(torch.load(file))
+   
 def __save_image(file, image):
     cv2.imwrite(file, image)
 
@@ -88,9 +111,6 @@ def __save_gif(file, video,fps=24, duration=None):
 
 def __load_gif(file):
     raise NotImplementedError("TODO!")
-
-
-
 
 def __save_hdf5(file, data, chunk=None, groups=[], attrs={}, compress=True):
     print("SAVE: ", file)
@@ -115,9 +135,9 @@ def __save_hdf5(file, data, chunk=None, groups=[], attrs={}, compress=True):
 def __load_hdf5(file):
     return h5py.File(file, 'r')
 
-__load = {'.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch,
+__load = {'.yaml':__load_yaml, '.json':__load_json, '.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch,
           '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hd5f':__load_hdf5}
-__save = {'.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch,
+__save = {'.yaml':__save_yaml, '.json':__save_json, '.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch,
           '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hd5f':__save_hdf5}
 
 def load(path, **kwargs):
@@ -156,6 +176,19 @@ def file(file, force=True, overwrite=False):
 
     return file
 
+def next(file, force=True):
+    o_file, ext = os.path.splitext(file)
+
+    i = 0
+    while os.path.exists(file):
+        i += 1
+        file = o_file + "(" + str(i) + ")" + ext
+        
+    if force:
+        os.makedirs(file)
+
+    return file
+
 def files(path, full=False):
     path = expand_user(path)
     assert os.path.isdir(path)
@@ -174,15 +207,6 @@ def file_datetime():
 def has_extension(file):
     return len(file.split('.')) > 1
 
-def save_json(obj, f):
-    f = file(f)
-    with open(f, 'w') as fp:
-        json.dump(obj, fp)
-
-def load_json(f):
-    with open(f, 'r') as fp:
-        data = json.load(fp)
-    return data
 
 
 if __name__ == "__main__":

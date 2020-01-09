@@ -48,11 +48,20 @@ def perspective(image, p1, p2):
     M = cv2.getPerspectiveTransform(p1, p2)
     dst = cv2.warpPerspective(image, M, (image.shape[1], image.shape[0]))
 
-def gray(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+def gray(image, components=(0.299, 0.587, 0.114)): #(N)WHC format
+    assert 3 <= len(image.shape) <=4
+    return (image[...,0] * components[0] + image[...,1] * components[1] + image[...,2] * components[2])[...,np.newaxis]
+
+    #return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) ?? hmm..
 
 def colour(image):
     return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+def binary(image, threshold=0.5):
+    indx = image > threshold
+    image[indx] = 1.
+    image[np.logical_not(indx)] = 0.
+    return image
 
 def CHW(image): #TORCH FORMAT
     '''
@@ -82,6 +91,7 @@ def HWC(image): #CV2 FORMAT
 
 if __name__ == "__main__":
     image = np.random.uniform(size=(100,100,3))
+
     cv2.imshow('image', image)
  
     cv2.imshow('translate', translate(image, 10, 10))
@@ -93,6 +103,10 @@ if __name__ == "__main__":
     cv2.imshow('resize', resize(image, (20,20)))
 
     cv2.imshow('crop', crop(image, (20,80), (10,20)))
+
+    cv2.imshow('gray', gray(image))
+
+    cv2.imshow('binary', binary(gray(image)))
 
     while cv2.waitKey(60) != ord('q'):
         pass

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import numpy as np
 from collections import namedtuple
 
-from pyworld.toolkit.tools.datautils import EMA, CMA
+from pyworld.toolkit.tools.datautils.accumulate import EMA, CMA
 from .Optimise import Optimiser, TorchOptimiser
 
 class AEOptimiser(TorchOptimiser):
@@ -19,6 +19,7 @@ class AEOptimiser(TorchOptimiser):
         super(AEOptimiser, self).__init__(ae, base_optimiser=torch.optim.Adam(ae.parameters(), lr=lr))
         self.__loss = loss
         self.cma = CMA(loss.__name__)
+        #self.__loss = torch.nn.MSELoss(reduction='sum')
        
     def step(self, x):
         loss = self.__loss(self.model(x), x.to(self.model.device))

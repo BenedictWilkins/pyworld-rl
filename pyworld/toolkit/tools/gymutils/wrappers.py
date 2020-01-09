@@ -42,7 +42,8 @@ class EpisodeRecordWrapper(gym.Wrapper):
             self.states.append(self.state_t)
             self.actions.append(np.nan)
             self.rewards.append(self.reward_t)
-
+            
+            print("SAVING: {0:<5} frames (states, actions, rewards)".format(len(self.states)))
             fu_save(self.path, {"state":self.states,"action":self.actions,"reward":self.rewards}, overwrite=False, force=True)
 
             self.states.clear()

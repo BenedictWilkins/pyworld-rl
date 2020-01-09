@@ -12,7 +12,7 @@ try:
 except:
     pass
 
-from pyworld.toolkit.tools.datautils import EMA, CMA
+from pyworld.toolkit.tools.datautils.accumulate import EMA, CMA
 
 class Optimiser:
     
@@ -35,10 +35,10 @@ class TorchOptimiser(Optimiser):
             self.base_optimiser = base_optimiser
     
     def __call__(self, *args, **kwargs):
-        self.optim.zero_grad()
+        self.base_optimiser.zero_grad()
         loss = self.step(*args, **kwargs)
         loss.backward()
-        self.optim.step()
+        self.base_optimiser.step()
 
     def __str__(self):
         return 'model:' + type(self.model).__name__  + '\nloss:' + self._loss.__name__ + '\noptimiser:' + str(self.optim)
