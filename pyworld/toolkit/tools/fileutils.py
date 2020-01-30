@@ -230,14 +230,17 @@ def next(file, force=True):
 
 def files(path, full=False):
     path = expand_user(path)
-    assert os.path.isdir(path)
+    if not os.path.isdir(path):
+        raise ValueError("path {0} does not exist".format(path))
+
     if not full:
         return [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
     else:
         return [path + f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
 
 def dirs(path):
-    assert os.path.isdir(path)
+    if not os.path.isdir(path):
+        raise ValueError("path {0} does not exist".format(path))
     return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
 
 def file_datetime():
