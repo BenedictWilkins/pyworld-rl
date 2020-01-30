@@ -5,34 +5,43 @@ Created on Tue Sep  3 12:05:53 2019
 
 @author: ben
 """
-from gym.envs.registration import register
+from gym.envs.registration import register as gym_register
+from gym.envs.registration import registry as gym_registry
 
 def unregister():
-   import gym
-   env_names = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0']    
+   
+   env_names = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 
+                'CoinCollector-Easy-v0', 'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
    for env_name in env_names:
-       if env_name in gym.envs.registry.env_specs:
-            del gym.envs.registry.env_specs[env_name]
+       if env_name in gym_registry.env_specs:
+            del gym_registry.env_specs[env_name]
 
-
-
+def register(id, entry_point, **kwargs):
+    if not id in gym_registry.env_specs:
+        try:
+            gym_register(id=id, entry_point=entry_point, **kwargs)
+        except Exception as e:
+            print("warning: failed to register environment\n" + str(e))
+            
 register(id='ObjectMover-v0', 
-                 entry_point='pyworld.environments.envs.objectmover:default')
+    entry_point='pyworld.environments.envs.objectmover:default')
 
 register(id='ObjectMover-v1',
-             entry_point='pyworld.environments.envs.objectmover:a', kwargs = {'shape':(1,64,64)})
+    entry_point='pyworld.environments.envs.objectmover:a', kwargs = {'shape':(1,64,64)})
 
 register(id='CoinCollector-Easy-v0', 
-         entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':False, 'speed':False})
+    entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':False, 'speed':False})
 
 register(id='CoinCollector-NoJump-v0', 
-         entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':False, 'speed':True})
+    entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':False, 'speed':True})
 
 register(id='CoinCollector-NoSpeed-v0', 
-         entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':True, 'speed':False})
+    entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':True, 'speed':False})
 
 register(id='CoinCollector-Hard-v0', 
-         entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':True, 'speed':True})
+    entry_point='pyworld.environments.envs.pygame.CoinCollector:CoinCollector', kwargs = {'jump':True, 'speed':True})
+
+
 
 
 '''

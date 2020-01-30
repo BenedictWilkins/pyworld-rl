@@ -6,8 +6,11 @@ Created on Wed Jun 12 10:44:12 2019
 @author: ben
 """
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+except:
+    print("WARNING: MODULE NOT FOUND: torch")
+
 import numpy as np
 import math  
 

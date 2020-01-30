@@ -112,6 +112,41 @@ def __save_gif(file, video,fps=24, duration=None):
 def __load_gif(file):
     raise NotImplementedError("TODO!")
 
+def __save_txt(file, string):
+    f = open(file, 'a')
+    f.write(string)
+    return f
+    
+def __load_txt(file):
+    with open(file, 'r') as f:
+        return f.readlines() 
+
+def __save_mp4(file, video, fps=24, format='bgr'):
+    #TODO ensure NHWC format...
+    if format.lower() == 'rgb': #opencv works with bgr format, reverse the 
+        video = video[:,:,:,::-1]
+    
+    if issubclass(video.dtype.type, np.integer):
+        if video.dtype.type != np.uint8:
+            video = video.astype(np.uint8)
+    elif issubclass(video.dtype.type, np.floating):
+        print("VIDEO WRITE WARNING: the supplied video dtype is {0} assuming an interval 0-1 for video encoding".format(str(video.dtype)))
+        video = (video * 255.).astype(np.uint8)
+    
+    #video must be CV format (NHWC)
+    colour = len(video.shape) == 4 and video.shape[3] == 3
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(file, fourcc, fps, (video.shape[2],video.shape[1]), colour)
+    for frame in video:
+        writer.write(frame)
+    
+def __load_mp4(file):
+    raise NotImplementedError("TODO!")
+
+    
+    
+
 def __save_hdf5(file, data, chunk=None, groups=[], attrs={}, compress=True):
     print("SAVE: ", file)
     if chunk is not None:
@@ -129,16 +164,16 @@ def __save_hdf5(file, data, chunk=None, groups=[], attrs={}, compress=True):
     if isinstance(data, np.ndarray) or isinstance(data, list):
        data  = {"dataset":data}
 
-    for k,d in data.items():
+    for k, d in data.items():
         dataset = f.create_dataset(str(k), data = d, compression=compression)
 
 def __load_hdf5(file):
     return h5py.File(file, 'r')
 
-__load = {'.yaml':__load_yaml, '.json':__load_json, '.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch,
-          '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hd5f':__load_hdf5}
-__save = {'.yaml':__save_yaml, '.json':__save_json, '.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch,
-          '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hd5f':__save_hdf5}
+__load = {'.txt':__load_txt, '.yaml':__load_yaml, '.json':__load_json, '.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch,
+          '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hd5f':__load_hdf5, '.mp4':__load_mp4}
+__save = {'.txt':__save_txt, '.yaml':__save_yaml, '.json':__save_json, '.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch,
+          '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hd5f':__save_hdf5, '.mp4':__save_mp4}
 
 def load(path, **kwargs):
     path = expand_user(path)
@@ -176,6 +211,10 @@ def file(file, force=True, overwrite=False):
 
     return file
 
+
+
+
+#TODO rename
 def next(file, force=True):
     o_file, ext = os.path.splitext(file)
 
@@ -210,8 +249,4 @@ def has_extension(file):
 
 
 if __name__ == "__main__":
-    save('./test/test.npz', (np.array([10,10,10]), np.array([1,1,1,1])))
-    print(load('./test/test.npz'))
-    for data in load('./test/test.npz'):
-
-        print(data)
+    save('~/Documents/test.mp4', np.random.uniform(size=(100,200,100, 3)))

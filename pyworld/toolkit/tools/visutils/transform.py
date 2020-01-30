@@ -63,6 +63,25 @@ def binary(image, threshold=0.5):
     image[np.logical_not(indx)] = 0.
     return image
 
+def __is_channels__(axes):
+    return axes == 1 or axes == 3 or axes == 4
+    
+def isCHW(image):
+    if image.shape == 2:
+        return True #1HW assumed
+    C_index = 4 - len(image.shape)
+    if C_index in [0,1] and __is_channels__(image.shape[C_index]):
+        return True
+    return False
+
+def isHWC(image):
+    if image.shape == 2:
+        return True #1HW assumed
+    C_index = 4 - len(image.shape)
+    if C_index in [0,1] and __is_channels__(image.shape[-1]):
+        return True
+    return False
+    
 def CHW(image): #TORCH FORMAT
     '''
         Converts an image (or collection of images) from HWC to CHW format.

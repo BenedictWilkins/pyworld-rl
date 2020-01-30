@@ -6,8 +6,8 @@ Created on Wed May 29 17:42:17 2019
 @author: ben
 """
 
-from . import diagnostics
+#from . import diagnostics
 from . import tools
 from . import nn
 
-__all__ = ('diagnostics', 'tools', 'nn')
+__all__ = ('tools', 'nn')

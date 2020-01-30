@@ -13,9 +13,9 @@ from inspect import signature
 from ..debugutils import assertion
 
 from . import accumulate
+from . import function
 
-
-__all__ = ('accumulate',)
+__all__ = ('accumulate', 'function')
 
 ''' #meh remove them...
 def arg(args, name, default):

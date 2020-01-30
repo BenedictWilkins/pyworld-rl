@@ -323,13 +323,17 @@ def gallery(images, cols=3):
             images: an array of N images in HWC or CHW format
             cols: number of columns in the image gallery
     '''
+    print(images.shape)
     
     array = __HWC_format(images) 
+    if len(array.shape) == 3:
+        array = array[:,:,:,np.newaxis] #NHWC format
+        
 
     nindex, height, width, intensity = array.shape    
     nrows = nindex//cols
 
-    fill = abs(nindex - ((nrows + 1) * cols))
+    fill = abs(nindex - ((nrows) * cols))
     #print(ncols, nrows, fill, width, height)
     if fill:
         zeros = np.zeros((fill, height, width, intensity))
@@ -353,7 +357,7 @@ def show(image, name='image'):
     __HWC_show(name, image)
 
 
-def play(video, name='video', wait=60, repeat=False, key='q'): #TODO fix repeat... (it relies on the iterator)
+def play(video, name='video', wait=30, repeat=False, key='q'): #TODO fix repeat... (it relies on the iterator)
     '''
         Plays a video (a sequence or iterable of images).
         Arguments:
@@ -401,6 +405,11 @@ def wait(name=None, key='q'):
 # -----------------  ----- USEFUL ----  ----------------
 # -----------------  -----------------  ----------------
 
+    
+
+
+
+
 def __HWC_format(array): #transform to HWC format
     '''
         dim(array) == 2 transform to HWC format
@@ -411,7 +420,7 @@ def __HWC_format(array): #transform to HWC format
     chw = 0
     hwc = 2
     if len(array.shape) == 3:
-        pass
+        return array
     elif len(array.shape) == 2:
         return array[:,:,np.newaxis]
     elif len(array.shape) == 4:
