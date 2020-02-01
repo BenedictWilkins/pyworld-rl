@@ -9,8 +9,10 @@ import os
 import pickle
 import datetime
 import json
-
+import re
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 try:
     import h5py #for storing large numeric arrays
@@ -36,6 +38,16 @@ try:
     import yaml
 except:
     pass
+
+
+
+
+def __matplot_figure_to_image(fig):
+    fig.canvas.draw()
+    # Get the RGBA buffer from the figure
+    w,h = fig.canvas.get_width_height()
+    buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    return np.flip(buf.reshape((h, w, 3)), 2) #bgr format for opencv!
 
 def __save_yaml(path, data):
     with open(path) as file:
@@ -89,8 +101,11 @@ def __save_torch(file, model):
 def __load_torch(file, model=None):
     assert model is not None #must provide a template model when loading a pytorch model
     model.load_state_dict(torch.load(file))
+    #for some reason returning the model here can cause issues (it is not loaded properly at the return...?)
    
 def __save_image(file, image):
+    if isinstance(image, plt.Figure):
+        image = __matplot_figure_to_image(image)
     cv2.imwrite(file, image)
 
 def __load_image(file):
@@ -143,9 +158,6 @@ def __save_mp4(file, video, fps=24, format='bgr'):
     
 def __load_mp4(file):
     raise NotImplementedError("TODO!")
-
-    
-    
 
 def __save_hdf5(file, data, chunk=None, groups=[], attrs={}, compress=True):
     print("SAVE: ", file)
@@ -236,7 +248,27 @@ def files(path, full=False):
     if not full:
         return [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
     else:
-        return [path + f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+        return [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+
+def sort_files(files):
+    '''
+        Sorts file by their tag (X): 
+        foo.txt
+        foo(1).txt
+        ...
+        foo(N).txt
+    '''
+    def number(file):
+        f = os.path.splitext(os.path.basename(file))[0]
+        x = re.findall("\(([0-9]+)\)", f)
+        if len(x) == 1:
+            return int(x[0])
+        elif len(x) == 0:
+            return 0
+        else:
+            raise ValueError("Invalid file name for sort: {0}".format(f))
+    return sorted(files, key = lambda x: number(x))
+
 
 def dirs(path):
     if not os.path.isdir(path):

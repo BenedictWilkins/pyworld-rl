@@ -26,6 +26,29 @@ import torch
 
 from . import fileutils as fu
 
+def get_runs(project):
+    try:
+        api = wandb.Api()
+        return [run for run in api.runs(project)]
+    except:
+        raise ValueError("Something went wrong retrieving the runs: ensure project is specified properly as \"username/projectname\".")
+
+def download_files(run, path=".", replace=False):
+    if isinstance(run, str):
+        api = wandb.Api()
+        run = api.run(run)
+
+    files = run.files()
+    print("-- DOWNLOADING {0} files from run {1} to folder {2}".format(len(files), run.name, path))
+    f_len = str(len(str(len(files))))
+    for i, file in enumerate(files):
+        print(("---- {0:<" + f_len  + "}/{1:<" + f_len + "} downloading {2}").format(i, len(files), file.name))
+        try:
+            file.download(root=path, replace=replace)
+        except:
+            print("---- file found locally")
+    print("-- FINISHED")
+
 class WB:
    
     def __init__(self, project, model, save=True, id=None,  config={}, **options):

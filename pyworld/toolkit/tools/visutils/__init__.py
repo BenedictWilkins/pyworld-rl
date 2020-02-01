@@ -133,9 +133,7 @@ def savefig(fig, path, extension = ".png"):
     if not fu.has_extension(path):
         path = path + extension
     path = fu.file(path)
-    
     img = figtoimage(fig)
-
     plt.imsave(path, img)
 
 def figtoimage(fig):
@@ -143,10 +141,9 @@ def figtoimage(fig):
     # Get the RGBA buffer from the figure
     w,h = fig.canvas.get_width_height()
     buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-
     return np.flip(buf.reshape((h, w, 3)), 2) #bgr format for opencv!
     
-def save(image, path,):
+def save(image, path):
     image = du.normalise(image)
     if not fu.has_extension(path):
         path = path + ".png"
