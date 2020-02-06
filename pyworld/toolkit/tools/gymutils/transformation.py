@@ -31,8 +31,6 @@ if __name__ == "__main__":
     s = stack(t)
     print(s)
 
-
-
 def assert_box(space):
     assert isinstance(space, gym.spaces.Box)
     
@@ -93,12 +91,17 @@ class __OM_Interval:
         
 class __OM_Crop:
     
-    def __init__(self, env, shape):
+    def __init__(self, env, box):
         assert_box(env.observation_space)
-        self.observation_space = env.observation_space #gym.spaces.Box(low=env.observation_space.low, high=env.observation_space.high, shape=shape, dtype=np.float32)
-    
-    def __call__(self, state, shape):
-        raise NotImplementedError()
+        low, high = assert_unique(env.observation_space)
+        assert len(box) == 4
+        self.box = box
+        w = box[2] - box[0]
+        h = box[3] - box[1]
+        c = env.observation_space.shape[2] #assume HWC format 
+        self.observation_space = gym.spaces.Box(low=low, high=high, shape=(h,w,c), dtype=env.observation_space.dtype)
+    def __call__(self, state):
+        return state[self.box[1]:self.box[3],self.box[0]:self.box[2],:]
     
 class __OM_Resize:
     

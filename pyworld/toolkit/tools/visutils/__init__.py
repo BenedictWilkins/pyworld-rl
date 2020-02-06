@@ -27,13 +27,14 @@ from .. import torchutils as tu
 from . import transform
 from . import animation
 from . import detection
+from . import plot # plotly
 
 try:
     import moviepy.editor as mpy
 except:
     mpy = None
 
-__all__ = ('transform', 'animation', 'detection')
+__all__ = ('transform', 'animation', 'detection', 'plot')
 
 def savevideo(iterator, path, extension = ".mp4", fps=30):
     if mpy is not None:

@@ -183,9 +183,9 @@ def __load_hdf5(file):
     return h5py.File(file, 'r')
 
 __load = {'.txt':__load_txt, '.yaml':__load_yaml, '.json':__load_json, '.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch,
-          '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hd5f':__load_hdf5, '.mp4':__load_mp4}
+          '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hdf5':__load_hdf5, '.mp4':__load_mp4}
 __save = {'.txt':__save_txt, '.yaml':__save_yaml, '.json':__save_json, '.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch,
-          '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hd5f':__save_hdf5, '.mp4':__save_mp4}
+          '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hdf5':__save_hdf5, '.mp4':__save_mp4}
 
 def load(path, **kwargs):
     path = expand_user(path)
@@ -280,6 +280,10 @@ def file_datetime():
 
 def has_extension(file):
     return len(file.split('.')) > 1
+
+def mkdir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 

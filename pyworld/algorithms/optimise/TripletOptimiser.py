@@ -161,6 +161,9 @@ class SSTripletOptimiser(PairTripletOptimiser):
         return z, ((z1 - z2) ** 2).sum(1)
 
 class SASTripletOptimiser(TripletOptimiser):
+
+    # monsterous... 
+    # TODO refactor to make use of the methods in __SASModel for consistency...
     
     class __SAModel(torch.nn.Module):
         
@@ -169,17 +172,32 @@ class SASTripletOptimiser(TripletOptimiser):
             assert len(tu.as_shape(s_model.output_shape)) == 1
             assert len(tu.as_shape(a_model.output_shape)) == 1
             action_shape = tu.as_shape(a_model.input_shape)[0] - (2 * tu.as_shape(s_model.output_shape)[0])
+
             if action_shape < 1:
-                raise ValueError('the input shape of the action model should be 2 x output_shape of the state model + the size of the action space, i.e. atleast > {0}'.format(2 * self.state.output_shape))
+                raise ValueError('the input shape of the action model should be 2 x output_shape of the state model + the size of the action space, i.e. atleast > {0}'.format(2 * s_model.output_shape))
             
             self.state = s_model
             self.action = a_model
-           
+
+            #used to generate combinations S x S x A by the optimiser
             self.action_space = torch.as_tensor(np.identity(action_shape, dtype=np.float32), device=self.device)
         
-        def forward(self, *args, **kwargs):
-            raise NotImplementedError("Use the sub-modules directly")
-        
+        def forward(self, s1, a, s2, **kwargs):
+            assert len(a.shape) > 1 and a.shape[1] > 1 # actions should be in 1-hot format
+  
+            # | x1 | x2 | a |.is used by the optimiser!
+            x1_ = self.state(s1) #N x D
+            x2_ = self.state(s2) #N x D
+            a = a.to(self.device)
+
+            x = torch.cat((x1_, x2_, a), 1) #N x 2D + A 
+            z = self.action(x) # N x O
+            return z
+
+        def distance(self, s1, a, s2, pnorm=2, **kwargs): #this should be the same as in the optimiser...
+            z = self.forward(s1, a, s2, **kwargs)
+            return torch.norm(z, p=pnorm, dim=1) #default L2 norm...
+
         @property
         def device(self):
             assert self.state.device == self.action.device
@@ -189,16 +207,23 @@ class SASTripletOptimiser(TripletOptimiser):
             r = super(SASTripletOptimiser._SASTripletOptimiser__SAModel, self).to(device)
             self.action_space.to(self.device)
             return r
+
+    def SASModel(s_model, a_model):
+        return SASTripletOptimiser._SASTripletOptimiser__SAModel(s_model, a_model)
             
     def __init__(self, s_model, a_model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005, pnorm=2):
-        super(SASTripletOptimiser, self).__init__(SASTripletOptimiser._SASTripletOptimiser__SAModel(s_model, a_model), margin, mode, k, lr)
+        super(SASTripletOptimiser, self).__init__(SASTripletOptimiser.SASModel(s_model, a_model), margin, mode, k, lr)
         self.pnorm = 2
         
     def step(self, s1, a, s2):
         '''
            (s1_i, a_i, s2_i) are considered positive any other combination are negative 
-           where a_i is taken from the set of possible actions.
-        #'''
+           where a_i is taken from the set of possible actions. 
+            Arguments:
+                s1: a batch of images (N x H x W x C) float32
+                a: a batch of actions (N x A) uint8
+                s2: a batch of images (N x H x W x C) float32
+        '''
         #self.optim.zero_grad()
         loss = self.loss(s1, a, s2, *self._TripletOptimiser__top[self.mode])
         self.cma.push(loss.item())
@@ -208,24 +233,27 @@ class SASTripletOptimiser(TripletOptimiser):
     
     def loss(self, s1, a, s2, topk_n = False, topk_p = False):
         #encode each state, of course this can be done more efficiently in the specific case!
+        if a.dtype != np.int64:
+            raise TypeError("a must be an N x 1 array of type int64 -- due to some weird pytorch indexing behaviour... (^_^)")
+
         x1_ = self.model.state(s1)
         x2_ = self.model.state(s2)
-        
+
         #print(s1.shape, s2.shape, a.shape)
         #print(x1_.shape, x2_.shape)
         
-        # |action_space| x batch_size x batch_size, distance matrix computed using the action model
+        # batch_size x batch_size x |action_space|. distance matrix computed using the action model
         # the positive examples are those indexed by [[0-batch_size-1], [0-batch_size-1], a]
         d = self.distance_matrix(x1_, x2_) # N x N x |A|
         #print(d.shape)
+        #print(d.shape, a.dtype)
 
-        indx = (range(d.shape[0]), range(d.shape[1]), a.squeeze())
-        xp = d[indx].unsqueeze(1) # batch_size x 1, A - P examples
+        indx = (range(d.shape[0]), range(d.shape[1]), a.squeeze())  #only works if a is int64 type (dunno why...)
+
+        xp = d[indx].unsqueeze(1) # batch_size x 1, ||A - P|| examples
 
         xn = d.reshape(d.shape[0], -1) # all others are negative, batch_size x (batch_size x actions)
         
-        #print(xp.shape, xn.shape)
-        #print(xn.shape)
         '''
         if topk_n and self.k < xn.shape[0]:
             #print("topk_n?")
@@ -234,7 +262,7 @@ class SASTripletOptimiser(TripletOptimiser):
             #print(xn.shape)
         '''
         
-        # |A-P| - |A-P| will be 0 so wont contribute to the loss
+        # ||A-P|| - ||A-P|| will be 0 so wont contribute to the loss
         
         xf = xp.unsqueeze(2) - xn #should only consist of only ||A-P|| - ||A-N|| [batch_size x batch_size x k]
         #print(xf.shape)
@@ -284,7 +312,7 @@ class SASTripletOptimiser(TripletOptimiser):
         return z # N x N x |A| similarity tensor
         
     def pre_alt1(self, x1, x2):
-            raise NotImplementedError("use pre_alt2, implement this if memory errors everywhere!")
+            raise NotImplementedError("use pre_alt2, TODO implement this if memory errors everywhere!")
             #alternative 1 (no copy) loop
             for action in self.action_space: #I could not think of a vectorised form that didnt involve doing a huge copy with torch.cat
                 a_ = action.expand(-1, *action.shape) #TODO fix
@@ -294,10 +322,10 @@ class SASTripletOptimiser(TripletOptimiser):
     def pre_alt2(self, x1, x2):
         '''
             Constructs a tensor from the two batches of state encodings each of dimension N x D.
-            The constructed tensor contains all possible combinations of x1, x2, actions, 
-            the tensor has dimension N x N |A| x M where |A| is the cardinality of the 
+            The constructed tensor contains all possible combinations of (x1, x2, actions)
+            the tensor has dimension N x N x |A| x M where |A| is the cardinality of the 
             action space (which is assumed to be discrete) and M = D + D + |A|.
-            The concatination creates a vector | x1 | x2 | a |.
+            Each M vector is concatinated: | x1 | x2 | a |.
             
             Arguments:
                 x1 : batch of states N x D
@@ -322,17 +350,10 @@ class SASTripletOptimiser(TripletOptimiser):
 
         return x # N x N x |A| x M
 
-
-
-
-
-
 if __name__ == "__main__":
     import pyworld.toolkit.tools.torchutils as tu
     from pyworld.toolkit.nn.MLP import MLP
     
-        
-
     state_shape = 3
     action_shape = 4
     batch_size = 2

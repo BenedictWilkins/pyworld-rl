@@ -31,6 +31,9 @@ class EpisodeRecordWrapper(gym.Wrapper):
         assert not self.already_done #dont save multiple times just because someone isnt calling reset!
          
         state, reward, done, info = self.env.step(action_t)
+        state = np.copy(state)
+
+
         self.states.append(self.state_t)
         self.actions.append(action_t)
         self.rewards.append(self.reward_t)
@@ -95,6 +98,7 @@ class ObservationWrapper(gym.ObservationWrapper):
         
     def observation(self, obs):
         return self.mode(obs)
+
     
 class RewardWrapper(gym.Wrapper):
     

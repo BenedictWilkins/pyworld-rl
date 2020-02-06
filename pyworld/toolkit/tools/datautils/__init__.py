@@ -77,6 +77,7 @@ def display_increments2(total):
         i += 1        
 
 def onehot(x, size, dtype=np.float32):
+
     r = np.zeros((x.shape[0], size), dtype=dtype)
     r[:, x.squeeze()] = 1
     return r
