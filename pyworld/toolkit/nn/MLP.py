@@ -26,9 +26,11 @@ class MLP(nn.Module):
             layers.append(nn.LeakyReLU())
         #print("layer", shapes[-2], shapes[-1])
         layers.append(nn.Linear(shapes[-2], shapes[-1]))
-        
         if output_activation is not None:
-            layers.append(output_activation)
+            self.output_activation = output_activation
+        else:
+            self.output_activation = torch.nn.Identity
+
         '''
         for i, layer in enumerate(self.layers):
             if isinstance(layer, nn.Module):
@@ -45,7 +47,7 @@ class MLP(nn.Module):
     
     def forward(self, x):
         x = x.to(self.device)
-        return self.layers(x)
+        return self.output_activation(self.layers(x))
 
 if __name__ == "__main__":
     import torch

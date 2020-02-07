@@ -71,6 +71,15 @@ def to_numpyf(model):
         Use: Wraps the output of a function (model) to a numpy array using numpy(x).
     '''
     return lambda *x: to_numpy(model(*x))
+
+def to_torch(x):
+    if torch.is_tensor(x):
+        return x
+    elif isinstance(x, np.ndarray):
+        return torch.from_numpy(x)
+    else:
+        return torch.Tensor(x) #???
+
     
 def device(display=True):
     device = None

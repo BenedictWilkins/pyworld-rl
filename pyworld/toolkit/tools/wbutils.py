@@ -71,6 +71,9 @@ class WB:
         self.__step += 1
         return self.__step
 
+    def histogram(self, array):
+        return wandb.Histogram(array)
+
     def image(self, array, name='image'):
         return [wandb.Image(array, caption=name)]
 
