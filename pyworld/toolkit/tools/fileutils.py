@@ -159,6 +159,18 @@ def __save_mp4(file, video, fps=24, format='bgr'):
 def __load_mp4(file):
     raise NotImplementedError("TODO!")
 
+def __save_avi(file):
+    raise NotImplementedError("TODO!")
+
+def __load_avi(file, as_numpy=True): #will be read as NHWC int format
+    vidcap = cv2.VideoCapture(file)
+    success, image = vidcap.read()
+    images = []
+    while success:
+        images.append(image)
+        success, image = vidcap.read()
+    return np.array(images)
+
 def __save_hdf5(file, data, chunk=None, groups=[], attrs={}, compress=True):
     print("SAVE: ", file)
     if chunk is not None:
@@ -183,9 +195,9 @@ def __load_hdf5(file):
     return h5py.File(file, 'r')
 
 __load = {'.txt':__load_txt, '.yaml':__load_yaml, '.json':__load_json, '.npz':__load_mpz, '.pickle':__load_pickle, '.pkl':__load_pickle, '.p':__load_pickle, '.pt':__load_torch,
-          '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hdf5':__load_hdf5, '.mp4':__load_mp4}
+          '.png':__load_image, '.jpg':__load_image, '.gif':__load_gif, '.hdf5':__load_hdf5, '.mp4':__load_mp4, '.avi':__load_avi}
 __save = {'.txt':__save_txt, '.yaml':__save_yaml, '.json':__save_json, '.npz':__save_mpz, '.pickle':__save_pickle, '.pkl':__save_pickle, '.p':__save_pickle, '.pt':__save_torch,
-          '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hdf5':__save_hdf5, '.mp4':__save_mp4}
+          '.png':__save_image, '.jpg':__save_image, '.gif':__save_gif, '.hdf5':__save_hdf5, '.mp4':__save_mp4, '.avi':__save_avi}
 
 def load(path, **kwargs):
     path = expand_user(path)
@@ -270,10 +282,14 @@ def sort_files(files):
     return sorted(files, key = lambda x: number(x))
 
 
-def dirs(path):
+def dirs(path, full=False):
     if not os.path.isdir(path):
         raise ValueError("path {0} does not exist".format(path))
-    return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+    if not full:
+        return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+    else:
+        return [os.path.join(path, f) for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+
 
 def file_datetime():
     return str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
@@ -285,7 +301,8 @@ def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-
+def files_with_extention(path, extension, full=False):
+    return [file for file in files(path, full=full) if file.endswith(extension)]
 
 if __name__ == "__main__":
     save('~/Documents/test.mp4', np.random.uniform(size=(100,200,100, 3)))

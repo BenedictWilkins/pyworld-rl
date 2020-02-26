@@ -129,7 +129,7 @@ class PairTripletOptimiser(TripletOptimiser):
         
         d = self.distance_matrix(x1_, x2_)
         xp = torch.diag(d).unsqueeze(1)
-        xn = d # careful with the diagonal!
+        xn = d # careful with the diagonal?
 
         if topk_n and self.k < xn.shape[0]:
             #remove xp - xn = 0, along  
@@ -149,7 +149,9 @@ class PairTripletOptimiser(TripletOptimiser):
 class SSTripletOptimiser(PairTripletOptimiser):
 
     def __init__(self, model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005):
-        super(PairTripletOptimiser, self).__init__(model, margin, mode, k, lr)
+        super(SSTripletOptimiser, self).__init__(model, margin, mode, k, lr)
+
+ 
 
     def state_state_distance(self, episode, batch_size=256):
         self.model.eval()
@@ -191,12 +193,14 @@ class SASTripletOptimiser(TripletOptimiser):
             a = a.to(self.device)
 
             x = torch.cat((x1_, x2_, a), 1) #N x 2D + A 
-            z = self.action(x) # N x O
+            z = self.action(x) # N x D?
             return z
 
-        def distance(self, s1, a, s2, pnorm=2, **kwargs): #this should be the same as in the optimiser...
+        def distance(self, sas, pnorm=2, **kwargs): #this should be the same as in the optimiser...
+            s1,a,s2 = sas
             z = self.forward(s1, a, s2, **kwargs)
-            return torch.norm(z, p=pnorm, dim=1) #default L2 norm...
+            assert pnorm == 2 ##... look below **2
+            return torch.norm(z, p=pnorm, dim=1) ** 2 #default L22 norm...
 
         @property
         def device(self):
@@ -272,7 +276,7 @@ class SASTripletOptimiser(TripletOptimiser):
             
         xf = F.relu(xf + self.margin) 
         
-        return xf.sum()
+        return xf.mean() #??sum??? ...
     
     def distance_matrix(self, x1, x2):
         ''' 
@@ -305,7 +309,8 @@ class SASTripletOptimiser(TripletOptimiser):
         
         if z.shape[1] > 1:
             #norm over D_out if vector output
-            z = torch.norm(z, p=self.pnorm, dim=1) #default L2 norm...
+            assert self.pnorm == 2 # look below ** 2
+            z = torch.norm(z, p=self.pnorm, dim=1) ** 2 #default L2 norm...
         
         z = z.view(*x_shape[:-1]) # (N x N x |A|) x 1 to shape N x N x |A|
         

@@ -26,8 +26,8 @@ def as_shape(shape):
 
 def collect(model, *data, batch_size=128):
     with torch.no_grad():
-        iterator = du.batch_iterator(*data, batch_size=batch_size, force_nonsingular=True)
-        result = torch.cat([model(*x).cpu() for x in iterator], axis=0)
+        iterator = du.batch_iterator(*data, batch_size=batch_size)
+        result = torch.cat([model(x).cpu() for x in iterator], axis=0)
     return result
 
 def load(model, *args, device = 'cpu', path = None, **kwargs): #see fileutils now...

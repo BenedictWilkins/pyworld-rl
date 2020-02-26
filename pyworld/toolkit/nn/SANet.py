@@ -22,21 +22,22 @@ class SANet(nn.Module):
     
     def __init__(self, state_shape, action_shape):
         super(SANet, self).__init__()
+        self.device = 'cpu'
         self.state_shape = tu.as_shape(state_shape)
         self.action_shape = tu.as_shape(action_shape)
 
-        self.conv1 = nn.Conv2d(self.state_shape[0], 64, kernel_size=4, stride=2)
-        self.conv2 = nn.Conv2d(64, 32, kernel_size=4, stride=1)
-        self.conv3 =  nn.Conv2d(32, 16, kernel_size=4, stride=1)
-        
+        s1 = tu.conv_output_shape(state_shape, 16, kernel_size=4, stride=2)
+        s2 = tu.conv_output_shape(s1, 32, kernel_size=4, stride=1)
+        s3 = tu.conv_output_shape(s2, 64, kernel_size=4, stride=1)
+    
+        self.conv1 = nn.Conv2d(state_shape[0], 16, kernel_size=4, stride=2)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=4, stride=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=4, stride=1)
+
         self.action_layer1 = nn.Linear(self.action_shape[0], 256)
-        self.action_layer2 = nn.Linear(256, 256)
-                
-        s1 = tu.conv_output_shape(self.state_shape[1:], kernel_size=4, stride=2)
-        s2 = tu.conv_output_shape(s1, kernel_size=4, stride=1)
-        s3 = tu.conv_output_shape(s2, kernel_size=4, stride=1)
+        self.action_layer2 = nn.Linear(256, 256)   
         
-        self.output_shape = tu.as_shape(int(np.prod(s3) * 16 + 256))
+        self.output_shape = tu.as_shape(int(np.prod(s3)) + 256)
         
     def inverse(self, share_weights=True):
         return tu.construct_inverse(self.conv1, self.conv2, self.conv3, share_weights=share_weights)
@@ -46,7 +47,7 @@ class SANet(nn.Module):
         return super(SANet, self).to(device)
     
     def forward(self, sa):
-        s, a = sa # this is easier with the use of an optimiser (otherwise we gotta mess around with * (x,) everywhere!)
+        s, a = sa # this is easier with the use of an optimiser (otherwise we gotta mess around with *(x,) everywhere!)
         s, a = s.to(self.device), a.to(self.device)
         a_ = F.leaky_relu(self.action_layer1(a))
         a_ = F.leaky_relu(self.action_layer2(a_))
@@ -69,11 +70,9 @@ class SANet2(SANet):
         self.output_shape = output_shape
         self.output_activation = output_activation
 
-
     def forward(self, sa):
         x_ = F.leaky_relu(super(SANet2, self).forward(sa))
         return self.output_activation(self.output_layer(x_))
-    
     
 class SANet3(nn.Module): #TODO
     

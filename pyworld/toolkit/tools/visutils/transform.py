@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 '''
-All transformations assume HWC image format (following the opencv convention).
+All transformations assume HWC float32 image format (following the opencv convention).
 '''
 
 def scale(image, scale, interpolation=cv2.INTER_CUBIC):
@@ -48,8 +48,7 @@ def perspective(image, p1, p2):
     M = cv2.getPerspectiveTransform(p1, p2)
     dst = cv2.warpPerspective(image, M, (image.shape[1], image.shape[0]))
 
-def gray(image, components=(0.299, 0.587, 0.114)): #(N)WHC format
-    assert 3 <= len(image.shape) <=4
+def gray(image, components=(0.299, 0.587, 0.114)): #(N)HWC format
     return (image[...,0] * components[0] + image[...,1] * components[1] + image[...,2] * components[2])[...,np.newaxis]
 
     #return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) ?? hmm..
@@ -63,20 +62,65 @@ def binary(image, threshold=0.5):
     image[np.logical_not(indx)] = 0.
     return image
 
+def to_bytes(image, ext='.png'):
+    if ext is not None:
+        success, image = cv2.imencode(ext, image)
+        if success:
+            return image.tobytes()
+        else:
+            raise ValueError("failed to convert image to bytes in format: {0}".format(ext))
+    else:
+        return image.tobytes() #just use numpy...?
+
+#---------------- BATCH_TRANSFORMATIONS
+
+def scale_all(images, _scale, interpolation=cv2.INTER_CUBIC, inplace=False):
+    if not len(images.shape) == 4 or not isHWC(images) or is_integer(images):
+        raise ValueError("invalid image format: {0} {1}, images must be in float32 NHWC format.".format(images.dtype, images.shape))
+    
+    if isinstance(_scale, tuple):
+        assert len(_scale) == 2
+    elif isinstance(_scale, (float, int)):
+        _scale = (_scale,_scale)
+    else:
+        raise ValueError("invalid argument: scale {0}".format(_scale))
+
+    nw = int(images.shape[2] * _scale[0])
+    nh = int(images.shape[1] * _scale[1])
+
+    def scale_all_inplace():
+        for i in range(images.shape[0]):
+            images[i,:nh,:nw,:] = scale(images[i], _scale,  interpolation=interpolation)
+        return images[:,:nh,:nw,:]
+
+    def scale_all():
+        result = np.empty((images.shape[0], nh, nw, images.shape[3]), dtype=np.float32)
+        for i in range(images.shape[0]):
+            result[i] = scale(images[i], _scale, interpolation=interpolation)
+        return result
+
+    return (scale_all, scale_all_inplace)[int(inplace)]()
+
 def __is_channels__(axes):
     return axes == 1 or axes == 3 or axes == 4
-    
+
 def isCHW(image):
-    if image.shape == 2:
-        return True #1HW assumed
+    '''
+        Is the given image in HWC or NHWC.
+        Arguments:
+            image: to check
+    '''
     C_index = 4 - len(image.shape)
     if C_index in [0,1] and __is_channels__(image.shape[C_index]):
         return True
     return False
 
 def isHWC(image):
-    if image.shape == 2:
-        return True #1HW assumed
+    '''
+        Is the given image in HWC or NHWC.
+        Arguments:
+            image: to check
+    '''
     C_index = 4 - len(image.shape)
     if C_index in [0,1] and __is_channels__(image.shape[-1]):
         return True
@@ -85,8 +129,9 @@ def isHWC(image):
 def CHW(image): #TORCH FORMAT
     '''
         Converts an image (or collection of images) from HWC to CHW format.
+        CHW format is the image format used by PyTorch.
     '''
-    if len(image.shape) == 2:
+    if len(image.shape) == 2: #assume HW format
         return image[np.newaxis,:,:]
     elif len(image.shape) == 3:    
         return image.transpose((2,0,1))
@@ -98,6 +143,7 @@ def CHW(image): #TORCH FORMAT
 def HWC(image): #CV2 FORMAT
     '''
         Converts an image (or collection of images) from CHW to HWC format.
+        HWC format is the image format used by PIL and opencv.
     '''
     if len(image.shape) == 2:
         return image[:,:,np.newaxis]
@@ -108,7 +154,33 @@ def HWC(image): #CV2 FORMAT
     else:
         raise ValueError("invalid dimension: " + str(len(image.shape)))
 
+def is_integer(image):
+    return issubclass(image.dtype.type, np.integer)
+
+def is_float(image):
+    return issubclass(image.dtype.type, np.floating)
+
+def to_float(image):
+    assert is_integer(image)
+    return image.astype(np.float32) / 255.
+
+def to_integer(image):
+    assert is_float(image)
+    return (image * 255.).astype(np.uint8) 
+
 if __name__ == "__main__":
+    def test_isHWC():
+        a = np.random.randint(0,255,size=(10,10))
+        assert not isHWC(a)
+        a = np.random.randint(0,255,size=(10,10,1))
+        assert isHWC(a)
+        a = np.random.randint(0,255,size=(100,10,10,1))
+        assert isHWC(a)
+    test_isHWC()
+
+
+
+    '''
     image = np.random.uniform(size=(100,100,3))
 
     cv2.imshow('image', image)
@@ -129,4 +201,4 @@ if __name__ == "__main__":
 
     while cv2.waitKey(60) != ord('q'):
         pass
-
+    '''

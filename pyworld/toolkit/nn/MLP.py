@@ -29,7 +29,7 @@ class MLP(nn.Module):
         if output_activation is not None:
             self.output_activation = output_activation
         else:
-            self.output_activation = torch.nn.Identity
+            self.output_activation = nn.Identity()
 
         '''
         for i, layer in enumerate(self.layers):

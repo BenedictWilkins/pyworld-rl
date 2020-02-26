@@ -55,7 +55,7 @@ class Sleep:
             
 class Time:
     
-    t = lambda: int(round(time.time() * 1000))
+    t = lambda: time.time()
     
     def __init__(self,  message=''):
          self.message = message
@@ -65,5 +65,6 @@ class Time:
         self.start = Time.t()
     
     def __exit__(self, type, value, traceback):
-        print(self.message, Time.t() - self.start) 
+        time = Time.t() - self.start
+        print(self.message, time) 
     

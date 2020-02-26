@@ -2,8 +2,31 @@ import plotly.graph_objects as go
 import plotly.subplots as subplots
 
 import numpy as np
+import io
 
 from types import SimpleNamespace as Namespace
+
+try:
+    from PIL import Image
+except:
+    pass
+
+try:
+    import cv2
+except:
+    pass
+
+from ipywidgets.embed import embed_minimal_html
+import webbrowser
+import os
+
+def show_widget(widget, title="widget"):
+    path = os.getcwd() + ".plot/"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    file = path + "temp.html"
+    embed_minimal_html(file, views=[widget], title=title)
+    webbrowser.open_new_tab(file)
 
 class Singleton:
 
@@ -42,6 +65,32 @@ def __layout_noaxis__():
     return {'xaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False},
             'yaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False}}
 
+def plot_coloured(x, y, z, bins=10, fig=None, row=None, col=None, show=True): #TODO rename this...?
+    '''
+        Plots x and y with lines coloured according to z. 
+        Arguments:
+            x: to plot
+            y: to plot
+            z: line colour values
+    '''
+    layout = __layout__()
+    if isinstance(bins, int):
+        min_z, max_z = np.min(z), np.max(z)
+        bins = np.linspace(min_z, max_z, bins)
+
+    #TODO when plotly allows for line segments to be coloured, fix this stuff!
+    if fig is None:
+        fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=x,y=y, mode='markers+lines', marker=dict(color=z)), row=row, col=col)
+
+    #for i in range(x.shape[0]):
+    #    fig.add_trace(go.Scatter(x=x[i:i+2], y=y[i:i+2], mode='lines', line = dict(color='rgb({0},0,0)'.format(np.random.randint(0,255)))))
+    
+    if show:
+        fig.show()
+    return fig
+
 def plot(x, y, mode = line_mode.line, legend=None, show=True):
     if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
         assert x.shape == y.shape
@@ -75,9 +124,9 @@ def plot(x, y, mode = line_mode.line, legend=None, show=True):
 
     return fig
 
-
-def histogram(x, bins=20, legend=None, log_scale=False, show=True):
+def histogram(x, bins=20, legend=None, log_scale=False, fig=None, row=None, col=None, show=True):
     if isinstance(x, np.ndarray):
+        x = x.squeeze()
         if len(x.shape) == 1:
             x = x[np.newaxis, :]
     elif isinstance(x, (list, tuple)):
@@ -91,17 +140,19 @@ def histogram(x, bins=20, legend=None, log_scale=False, show=True):
     legend = __legend__(legend, len(x))
     layout = __layout__()
 
-    fig = go.Figure(layout=layout)
-    fig.update_layout(plot_bgcolor='white')
+    if fig is None:
+        fig = go.Figure(layout=layout)
+        fig.update_layout(plot_bgcolor='white')
+
     if log_scale:
         fig.update_layout(yaxis_type="log")
 
     for i, xi in zip(range(len(x)), x):
-        fig.add_trace(go.Histogram(x=xi, name=legend[i], xbins=dict(size=binsize)))
+        fig.add_trace(go.Histogram(x=xi, name=legend[i], xbins=dict(size=binsize)), row=row, col=col)
     if show:
         fig.show()
-
     return fig
+
 
 def histogram_slider(fig, range=range(1,20,1)):
     fig = go.FigureWidget(fig)
@@ -160,6 +211,9 @@ def scroll_images(images, show=True):
 
     return fig
 
+def to_numpy(fig, scale=0.25):
+    return np.array(Image.open(io.BytesIO(fig.to_image(".png", scale=0.25))))
+
 def __frame_args__(duration):  
     return {"frame": {"duration": duration},
             "mode": "immediate",
@@ -198,6 +252,27 @@ def play(images, show=True):
         fig.show()
     return fig
 
+def subplot(rows=1, cols=1):
+    return subplots.make_subplots(rows=rows, cols=cols)
+
+'''
+def subplot(*figures, show=True):
+    #layout information is lost...
+    size = int(np.ceil(np.sqrt(len(figures))))
+    fig = subplots.make_subplots(rows = size, cols = size)
+    for i, f in enumerate(figures):
+        fd = f.to_dict()
+        for d in fd['data']:
+            fig.add_trace(d, row=(i % size) +1, col = (i // size) + 1)
+
+    if show:
+        fig.show()
+
+    return fig
+'''
+
+
+ 
 if __name__ == "__main__":
 
     def histogram_demo():
@@ -207,9 +282,31 @@ if __name__ == "__main__":
         fig = histogram_slider(fig, range=range(1,50,3))
         fig.show()
 
+    def histogram_demo2():
+        y1 = np.random.randint(0,10, size=(1000,1))
+        fig = histogram(y1, log_scale=True, bins=5, show=False)
+        fig = histogram_slider(fig, range=range(1,50,3))
+        fig.show()
+
     def image_demo():
         image = np.random.randint(0,255, size=(500,100,100,3))
         #plot_image(image)
         play(image)
 
-    histogram_demo()
+    def subplot_demo():
+        y1 = np.random.randint(0,10, size=10)
+        y2 = np.random.randint(0,10, size=10)
+        fig = histogram(y1, log_scale=True, bins=5, show=False)
+        #from pprint import pprint
+        #pprint(fig.to_dict())
+        fig = subplot(fig)
+        fig.show()
+
+    def plot_coloured_demo():
+        x = np.linspace(0, 4*np.pi, 1000)
+        y = np.sin(x)
+        z = np.linspace(0,10,1000)
+        plot_coloured(x,y,z)
+
+    #http://etpinard.xyz/plotly-dashboards/hover-images/
+    #https://github.com/etpinard/plotly-dashboards/blob/master/hover-images/index.html

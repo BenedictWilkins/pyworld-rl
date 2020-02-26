@@ -28,6 +28,8 @@ from . import transform
 from . import animation
 from . import detection
 from . import plot # plotly
+from . import jupyter #IPython visuals that only work well in jupyter...
+
 
 try:
     import moviepy.editor as mpy
@@ -324,12 +326,13 @@ def gallery(images, cols=3):
     print(images.shape)
     
     array = __HWC_format(images) 
+    print(array.shape)
     if len(array.shape) == 3:
         array = array[:,:,:,np.newaxis] #NHWC format
         
 
     nindex, height, width, intensity = array.shape    
-    nrows = nindex//cols
+    nrows = int(np.ceil(nindex/cols))
 
     fill = abs(nindex - ((nrows) * cols))
     #print(ncols, nrows, fill, width, height)
@@ -340,6 +343,7 @@ def gallery(images, cols=3):
         nindex, height, width, intensity = array.shape    
         nrows = nindex//cols
         
+    print(array.shape)
     #assert nindex == nrows*ncols
     # want result.shape = (height*nrows, width*ncols, intensity)
     result = (array.reshape(nrows, cols, height, width, intensity)

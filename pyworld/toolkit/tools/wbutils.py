@@ -9,6 +9,8 @@ Created on Fri Jul  5 15:36:14 2019
 # W&B Imports
 
 import os
+import re
+
 '''
 #doesnt work... why not :(
 if 'WB_ONLINE' in globals():
@@ -26,6 +28,9 @@ import torch
 
 from . import fileutils as fu
 
+def dryrun(value=True):
+    os.environ["WANDB_MODE"] = ("run", "dryrun")[int(value)]
+
 def get_runs(project):
     try:
         api = wandb.Api()
@@ -33,7 +38,10 @@ def get_runs(project):
     except:
         raise ValueError("Something went wrong retrieving the runs: ensure project is specified properly as \"username/projectname\".")
 
-def download_files(run, path=".", replace=False):
+def download_files(run, path=".", replace=False, skip=[]):
+    def should_skip(file):
+        return any(re.match(file, pattern) for pattern in skip)
+
     if isinstance(run, str):
         api = wandb.Api()
         run = api.run(run)
@@ -42,11 +50,14 @@ def download_files(run, path=".", replace=False):
     print("-- DOWNLOADING {0} files from run {1} to folder {2}".format(len(files), run.name, path))
     f_len = str(len(str(len(files))))
     for i, file in enumerate(files):
-        print(("---- {0:<" + f_len  + "}/{1:<" + f_len + "} downloading {2}").format(i, len(files), file.name))
-        try:
-            file.download(root=path, replace=replace)
-        except:
-            print("---- file found locally")
+        if not should_skip(file):
+            print(("---- {0:<" + f_len  + "}/{1:<" + f_len + "} downloading {2}").format(i, len(files), file.name))
+            try:
+                file.download(root=path, replace=replace)
+            except:
+                print("---- file found locally") #??
+        else:
+            print("---- skipping file {0}".format(file))
     print("-- FINISHED")
 
 class WB:
@@ -78,12 +89,13 @@ class WB:
         return [wandb.Image(array, caption=name)]
 
     def save(self, overwrite=True):
+        print("--- saving model: step {0}".format(self.__step))
         file = os.path.join(wandb.run.dir, 'model.pt')
-        print("wbsave: ", file)
         if not overwrite:
             file = fu.file(file)
         torch.save(self.model.state_dict(), file)
         wandb.save(file)
+        print("--- done.")
    
     def __exit__(self, type, value, traceback):
         if self.__save:
