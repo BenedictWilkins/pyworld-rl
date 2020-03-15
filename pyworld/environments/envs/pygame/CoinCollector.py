@@ -20,15 +20,15 @@ class CoinCollector(Environment.GameEnvironment):
                'down_left':    lambda env: env.set_position(env.position + env.speed * np.array([-1,1])),
                'left':         lambda env: env.set_position(env.position + env.speed * np.array([-1,0])),
                'up_left':      lambda env: env.set_position(env.position + env.speed * np.array([-1,-1])),
-               'jump':         lambda env: env.set_position(env.position + np.random.randint(0, env.observation_space.shape[1], size=2)), 
+               'jump':         lambda env: env.set_position(np.array(env.observation_space.shape[:2])/2.), 
                'slow':         lambda env: env.set_speed(max(env.speed - 1, 1)),
                'fast':         lambda env: env.set_speed(min(env.speed + 1, 10))}
               
    
    actions = ['up', 'up_right', 'right', 'down_right', 'down', 'down_left', 'left', 'up_left', 'jump', 'slow', 'fast']
+   actions_simple = actions[:-3]
    actions_no_speed = actions[:-2]
    actions_no_jump = actions[:-3] + actions[-2:]
-   actions_no_speed_or_jump = actions[:-3]
 
    def __init__(self, size=128, background_colour=(0,0,0), speed=True, jump=True):
       actions = CoinCollector.actions
@@ -39,11 +39,9 @@ class CoinCollector(Environment.GameEnvironment):
       elif not jump:
          actions = CoinCollector.actions_no_jump
       
-      print(actions)
-         
       super(CoinCollector, self).__init__(actions, display_size=(size, size), background_colour=background_colour)
       self.speed = 1.
-      self.position = np.array(self.observation_space.shape[1:]) / 2.
+      self.position = np.array(self.observation_space.shape[:2]) / 2.
       
    def set_position(self, new_position):
       self.position = new_position
@@ -65,7 +63,7 @@ class CoinCollector(Environment.GameEnvironment):
    
    def reset(self):
        self.speed = 1.
-       self.position = np.array(self.observation_space.shape[1:]) / 2.
+       self.position = np.array(self.observation_space.shape[:2]) / 2.
        self.display.fill(self.background_colour)
        self.fill_circle(self.position, 8, (255,255,255))
 

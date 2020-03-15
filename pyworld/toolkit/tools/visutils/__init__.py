@@ -323,10 +323,7 @@ def gallery(images, cols=3):
             images: an array of N images in HWC or CHW format
             cols: number of columns in the image gallery
     '''
-    print(images.shape)
-    
     array = __HWC_format(images) 
-    print(array.shape)
     if len(array.shape) == 3:
         array = array[:,:,:,np.newaxis] #NHWC format
         
@@ -343,7 +340,6 @@ def gallery(images, cols=3):
         nindex, height, width, intensity = array.shape    
         nrows = nindex//cols
         
-    print(array.shape)
     #assert nindex == nrows*ncols
     # want result.shape = (height*nrows, width*ncols, intensity)
     result = (array.reshape(nrows, cols, height, width, intensity)

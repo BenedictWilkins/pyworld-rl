@@ -7,11 +7,17 @@ Created on Tue Sep  3 12:05:53 2019
 """
 from gym.envs.registration import register as gym_register
 from gym.envs.registration import registry as gym_registry
+import copy
+
+env_names = ['ObjectMover-v0', 'ObjectMover-v1', 
+             'CoinCollector-NoJump-v0', 'CoinCollector-Easy-v0', 
+             'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
+
+def environments():
+    return copy.copy(env_names)
 
 def unregister():
    
-   env_names = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 
-                'CoinCollector-Easy-v0', 'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
    for env_name in env_names:
        if env_name in gym_registry.env_specs:
             del gym_registry.env_specs[env_name]

@@ -19,6 +19,8 @@ from . import datautils as du
 def as_shape(shape):
     if isinstance(shape, tuple):
         return shape
+    elif isinstance(shape, list):
+        return tuple(shape)
     elif isinstance(shape, int):
         return (shape,)
     else:

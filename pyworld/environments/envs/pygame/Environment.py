@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec 12 14:00:12 2019
-
-author: Benedict Wilkins
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
 Created on Thu Dec 12 12:06:13 2019
 
 author: Benedict Wilkins
 """
 import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import pygame.gfxdraw
 
@@ -36,9 +29,7 @@ def update_decorator(func):
       return ret
             
     return decorator
- 
 
-         
 
 class StepMeta(type):
    
@@ -53,19 +44,21 @@ class StepMeta(type):
           raise AttributeError('Attribute \'reset\' must be defined by class:' + mcls)
    
       return super(StepMeta, mcls).__new__(mcls, name, bases, local)
-        
+
 class GameEnvironment(gym.Env, metaclass = StepMeta):
 
-
     def __init__(self, actions, display_size=(128,128), background_colour=(255,255,255)):
-      super(GameEnvironment, self).__init__()
-      self.display = pygame.display.set_mode(display_size) 
-      
-      self.background_colour = background_colour
-      
-      self.observation_space = gym.spaces.Box(low=0., high=1., shape=((3, display_size[1], display_size[0])), dtype=np.float32)
-      self.action_space = gym.spaces.Discrete(len(actions))
-      self.actions = actions
+        super(GameEnvironment, self).__init__()
+        self.display = pygame.display.set_mode(display_size) 
+        
+        self.background_colour = background_colour
+
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=((display_size[0], display_size[1], 3)), dtype=np.uint8)
+        self.action_space = gym.spaces.Discrete(len(actions))
+        self.actions = actions
+    
+    def get_action_meanings(self):
+        return self.actions
      
     def get_image_raw(self):
         '''
@@ -75,28 +68,27 @@ class GameEnvironment(gym.Env, metaclass = StepMeta):
         return pygame.surfarray.array3d(self.display)
 
     def get_image(self):
-      '''
-         Get the current state as an image in CHW format.
-      '''
-      #makes a copy of the current pixel buffer WHC 0-255
-      pygame.display.update()
-      return pygame.surfarray.array3d(self.display).transpose(2,1,0).astype(np.float32) / 255.0
+        '''
+            Get the current state as an image.
+        '''
+        pygame.display.update()
+        return np.copy(pygame.surfarray.array3d(self.display))
    
     def fill_circle(self, position, radius, colour):
-      pygame.gfxdraw.filled_circle(self.display, int(position[0]), int(position[1]), int(radius), colour)
-      pygame.gfxdraw.aacircle(self.display, int(position[0]), int(position[1]), int(radius), colour)
+        pygame.gfxdraw.filled_circle(self.display, int(position[0]), int(position[1]), int(radius), colour)
+        pygame.gfxdraw.aacircle(self.display, int(position[0]), int(position[1]), int(radius), colour)
       
     def draw_circle(self, position, radius, colour):
-      pygame.gfxdraw.aacircle(self.display, int(position[0]), int(position[1]), int(radius), colour)
+         pygame.gfxdraw.aacircle(self.display, int(position[0]), int(position[1]), int(radius), colour)
    
     def step(self, action, **kwargs):
-      pass
+        pass
 
     def reset(self, **kwargs):
-      pass
+        pass
    
     def render(self, **kwargs):
-      os.environ["SDL_VIDEODRIVER"] = OLD_VDRIVER
+        os.environ["SDL_VIDEODRIVER"] = OLD_VDRIVER
 
 class TestGame(GameEnvironment):
    

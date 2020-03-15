@@ -8,7 +8,7 @@ author: Benedict Wilkins
 import gym
 import numpy as np
 
-from . import transformation
+from . import transform
 
 from ..fileutils import save as fu_save
 
@@ -87,9 +87,11 @@ class OnehotUnwrapper(gym.Wrapper):
     def step(self, action):
         return self.env.step(np.where(action==1)[0][0])
     
+
+# TODO deprecate this....
 class ObservationWrapper(gym.ObservationWrapper):
     
-    mode = transformation.mode
+    mode = transform.mode
 
     def __init__(self, env, mode, **modeargs):
         super(ObservationWrapper, self).__init__(env)
@@ -98,7 +100,6 @@ class ObservationWrapper(gym.ObservationWrapper):
         
     def observation(self, obs):
         return self.mode(obs)
-
     
 class RewardWrapper(gym.Wrapper):
     

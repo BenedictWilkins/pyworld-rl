@@ -36,6 +36,40 @@ def exit_on(iterator, on):
 
 from .batch import batch_iterator
 
+
+def window(x, shape):
+    '''
+        Slides a window (2D) of the given shape across the given array.
+        Arguments:
+            x: array
+            shape: of window 
+        Returns:
+            3D array containing each possible window of the given shape (stride = 1), top-left to bottom-right.
+    '''
+    assert len(x.shape) == 2 #TODO colour... (HWC) currently only 2D arrays are supported :(
+    assert len(shape) == 2
+
+    s = (x.shape[0] - shape[0] + 1,) + (x.shape[1] - shape[1] + 1,) + shape
+    strides = x.strides + x.strides
+    r = np.lib.stride_tricks.as_strided(x, shape=s, strides=strides)
+    return r.reshape(r.shape[0] * r.shape[1], *r.shape[2:])
+    #return r
+
+
+def window_b(x, shape):
+    '''
+        Batch version of window - applies sliding window over each 2d array in a batch.
+        TODO
+    '''
+    assert len(x.shape) == 3 #use the non-batch version?
+    assert len(shape) == 2
+    
+    shape = tuple(np.subtract(x.shape[1:], shape) + 1) + (x.shape[0],) + shape
+    strides = (x.strides * 2)[1:]
+    M = np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides)
+    return M.reshape(np.prod(M.shape[0:2]), *M.shape[2:]).swapaxes(0,1)
+
+
 def invert(index, shape):
     '''
         Get inverted index e.g. [1,3,4,5], 10 -> [2,6,7,8,9]
@@ -86,37 +120,6 @@ def onehot(x, size, dtype=np.float32):
     r[np.arange(x.shape[0]), x] = 1
     return r
 
-'''
-def onehot(y, size=None):
-    if size is None:
-        size = len(np.unique(y))
-    y = y.reshape(y.shape[0])
-    #print(leny, y)
-    r = np.zeros((y.shape[0], size))
-    r[:, y] = 1.
-    return r
-'''
-
-
-def onehot_int(y, size): #deprecated... use onehot
-    r = np.zeros((size))
-    r[y] = 1
-    return r
-
-def mnist(normalise=True):
-    import tensorflow as tf
-    mnist = tf.keras.datasets.mnist
-    
-    (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    x_train = np.expand_dims(x_train, 1).astype(np.float32)
-    y_train = np.expand_dims(y_train, 1) 
-    x_test = np.expand_dims(x_test, 1).astype(np.float32)
-    y_test = np.expand_dims(y_test, 1)
-    if normalise:
-        return x_train / 255.0, y_train, x_test / 255.0, y_test
-    else:
-        return x_train, y_train, x_test, y_test
-
 def splitbylabel(x, y):
     result = {}
     for label in np.unique(y):
@@ -150,7 +153,7 @@ def __dtype__(i):
     return type(i)
 
 
-def __non_singular(iterator):
+def __non_singular(iterator): #TODO refactor - use zip (see batch)
     def non_singular_iterator(iterator):
         for x in iterator:
             yield (x,)
@@ -163,7 +166,7 @@ def __non_singular(iterator):
         x = (x,)
     return iterator, x    
 
-def __init_dataset(iterator, size, template=None):
+def __init_dataset(iterator, size, template=None): #TODO refactor
     iterator, x = __non_singular(iterator)
     
     if template is None:
@@ -182,7 +185,7 @@ def __init_dataset(iterator, size, template=None):
     
     return iterator, result
     
-def dataset(iterator, size=1000, template=None, progress=0):
+def dataset(iterator, size=1000, template=None, progress=0): #TODO refactor
     iterator, result = __init_dataset(iterator, size, template)
     iterator = itertools.islice(iterator, 0, size-1)
     if not progress:
@@ -243,10 +246,16 @@ def pack(iterator): #????
             
     return tuple([np.array(z) for z in result])
 
+def normalise(data, axis=None):
+    maxd = np.max(data, axis=axis)
+    mind = np.min(data, axis=axis)
+    
+    if axis is not None:
+        broadcast_shape = list(mind.shape)
+        broadcast_shape.insert(axis,1)
+        maxd = maxd.reshape(broadcast_shape)
+        mind = mind.reshape(broadcast_shape)
 
-def normalise(data):
-    maxd = np.max(data)
-    mind = np.min(data)
     return (data - mind) / (maxd - mind)
 
 def group_avg(x,y):

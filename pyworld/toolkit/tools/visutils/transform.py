@@ -1,11 +1,15 @@
 import cv2
 import numpy as np
 
+from types import SimpleNamespace
+
 '''
 All transformations assume HWC float32 image format (following the opencv convention).
 '''
 
-def scale(image, scale, interpolation=cv2.INTER_CUBIC):
+interpolation = SimpleNamespace(cubic=cv2.INTER_CUBIC, nearest=cv2.INTER_NEAREST, area=cv2.INTER_AREA)
+
+def scale(image, scale, interpolation=interpolation.area):
     '''
         scales the given image
         Arguments:
@@ -18,13 +22,16 @@ def scale(image, scale, interpolation=cv2.INTER_CUBIC):
         return cv2.resize(image, None, fx=scale[0], fy=scale[1], interpolation=interpolation)
     return cv2.resize(image, None, fx=scale, fy=scale, interpolation=interpolation)
 
-def resize(image, size, interpolation=cv2.INTER_CUBIC):
+def resize(image, size, interpolation=interpolation.area):
     if isinstance(size, tuple):
         assert len(size) == 2
         return cv2.resize(image, size, interpolation=interpolation)
     return cv2.resize(image, (size, size), interpolation=interpolation)
 
-def crop(image, xsize, ysize, copy=True):
+def crop(image, xsize=None, ysize=None, copy=False):
+    assert isinstance(xsize, tuple) and len(xsize) == 2
+    assert isinstance(ysize, tuple) and len(ysize) == 2
+
     image_c = image[ysize[0]:ysize[1], xsize[0]:xsize[1]]
     if copy:
         return np.copy(image_c)
@@ -51,10 +58,8 @@ def perspective(image, p1, p2):
 def gray(image, components=(0.299, 0.587, 0.114)): #(N)HWC format
     return (image[...,0] * components[0] + image[...,1] * components[1] + image[...,2] * components[2])[...,np.newaxis]
 
-    #return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) ?? hmm..
-
 def colour(image):
-    return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+    return cv2.cvtColor(image.squeeze(), cv2.COLOR_GRAY2RGB)
 
 def binary(image, threshold=0.5):
     indx = image > threshold
@@ -74,7 +79,15 @@ def to_bytes(image, ext='.png'):
 
 #---------------- BATCH_TRANSFORMATIONS
 
-def scale_all(images, _scale, interpolation=cv2.INTER_CUBIC, inplace=False):
+#TODO others?
+
+def binary_all(images, threshold=0.5):
+    return binary(images, threshold=threshold)
+
+def gray_all(image, components=(0.299, 0.587, 0.114)): #(N)HWC format
+    return gray(image, components=components)
+
+def scale_all(images, _scale, interpolation=interpolation.area, inplace=False):
     if not len(images.shape) == 4 or not isHWC(images) or is_integer(images):
         raise ValueError("invalid image format: {0} {1}, images must be in float32 NHWC format.".format(images.dtype, images.shape))
     
@@ -100,6 +113,41 @@ def scale_all(images, _scale, interpolation=cv2.INTER_CUBIC, inplace=False):
         return result
 
     return (scale_all, scale_all_inplace)[int(inplace)]()
+
+def resize_all(images, size, interpolation=interpolation.area):
+    if not len(images.shape) == 4 or not isHWC(images) or is_integer(images):
+        raise ValueError("invalid image format: {0} {1}, images must be in float32 NHWC format.".format(images.dtype, images.shape))
+    if isinstance(size, tuple):
+        assert len(size) == 2
+    elif isinstance(size, int):
+        size = (size,size)
+    else:
+        raise ValueError("invalid argument: size {0}".format(size))
+ 
+    def resize_all():
+        result = np.empty((images.shape[0], size[1], size[0], images.shape[3]), dtype=np.float32)
+        for i in range(images.shape[0]):
+            result[i] = cv2.resize(images[i], size, interpolation=interpolation).reshape(size[1], size[0], images.shape[3])
+        return result
+
+    return resize_all()
+
+def crop_all(images, xsize=None, ysize=None, copy=False):
+    if not len(images.shape) == 4 or not isHWC(images):
+         raise ValueError("invalid image format: {1}, images must be in NHWC format.".format(images.shape))
+    if xsize is None:
+        xsize = (0,images.shape[2])
+    if ysize is None:
+        ysize = (0,images.shape[1])
+
+    assert isinstance(xsize, tuple) and len(xsize) == 2
+    assert isinstance(ysize, tuple) and len(ysize) == 2
+
+    image_c = images[:,ysize[0]:ysize[1], xsize[0]:xsize[1]]
+    if copy:
+        return np.copy(image_c)
+    return image_c
+
 
 def __is_channels__(axes):
     return axes == 1 or axes == 3 or axes == 4

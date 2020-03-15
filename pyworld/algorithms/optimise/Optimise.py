@@ -8,6 +8,7 @@ Created on Fri Jun 14 11:22:46 2019
 
 try:
     import torch
+    import torch.nn.functional as F
     import numpy as np
 except:
     pass
@@ -39,10 +40,22 @@ class TorchOptimiser(Optimiser):
         loss = self.step(*args, **kwargs)
         loss.backward()
         self.base_optimiser.step()
+        return loss.item()
 
     def __str__(self):
         return 'model:' + type(self.model).__name__  + '\nloss:' + self._loss.__name__ + '\noptimiser:' + str(self.optim)
 
     def __repr__(self):
         return str(self)
+
+class BCEOptimiser(TorchOptimiser):
+
+    def __init__(self, model, logits=True, base_optimiser=None):
+        super(BCEOptimiser, self).__init__(model, base_optimiser=base_optimiser)
+        self.__loss_fun = (F.binary_cross_entropy, F.binary_cross_entropy_with_logits)[int(logits)]
+
+    def step(self, x, y):
+        z = self.model(x)
+        return self.__loss_fun(z, y)
+
         

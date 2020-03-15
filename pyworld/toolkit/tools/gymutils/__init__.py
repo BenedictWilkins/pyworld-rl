@@ -15,11 +15,11 @@ from .. import datautils as du
 from . import iterators
 from . import policy
 from . import wrappers
-from . import transformation
+from . import transform
 from . import mode
 
 
-__all__ = ('iterators', 'policy', 'wrappers', 'transformation', 'mode')
+__all__ = ('iterators', 'policy', 'wrappers', 'transform', 'mode')
 
 PYWORLD_ENVIRONMENTS = ['ObjectMover-v0', 'ObjectMover-v1', 'CoinCollector-NoJump-v0', 'CoinCollector-Easy-v0',
                         'CoinCollector-NoSpeed-v0', 'CoinCollector-Hard-v0']
@@ -35,7 +35,7 @@ def make(name = 'Pong-v0', binary=None, stack=None):
         Creates pre-wrapped environments from gym. The state space is reduce to (H,W,C) format - (84,84,1). The action space is unchanged.
         Arguments:
             name: of the envionment to make
-            binary: a value [0,1] as the threshold for binarising the state space, or None if the binary transformation is not required.
+            binary: a value [0,1] as the threshold for binarising the state space, or None if the binary transform is not required.
             stack: stacks N > 1 previous frames included as part of the state, new observation shape is [N * C, H, W], or None is frame stacking is not required.
         Returns:
             a gym environment
@@ -112,10 +112,22 @@ def datasets(env, policy=None, mode=mode.s, size=1000, onehot=False, epochs=1):
         yield template
   
 def episode(env, policy=None, mode=mode.s, onehot=False, max_episode_size=10000):
+    '''
+        Creates an episode from the given environment and policy.
+        Arguments:
+            env: to play
+            policy: to select actions from - a function with signature: action = policy(state)
+            mode: one of `gyutils.mode`, default to state
+            onehot: if actions should be given as onehot vectors
+            max_episode_size: number of environment steps before the episode is cut short.
+        Returns:
+
+    '''
+
     env.reset()
     assert mode in iterators.iterators
     iterator = iterators.GymIterator(env, policy, mode, onehot=onehot, episodic = True)
-    #iterator = iterators.itertools.islice(iterator, 0, max_episode_size)
+    iterator = iterators.itertools.islice(iterator, 0, max_episode_size)
     
     return mode(*du.pack(iterator))
 

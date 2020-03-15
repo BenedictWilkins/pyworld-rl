@@ -1,3 +1,4 @@
+import plotly
 import plotly.graph_objects as go
 import plotly.subplots as subplots
 
@@ -20,13 +21,13 @@ from ipywidgets.embed import embed_minimal_html
 import webbrowser
 import os
 
-def show_widget(widget, title="widget"):
-    path = os.getcwd() + ".plot/"
-    if not os.path.exists(path):
-        os.makedirs(path)
-    file = path + "temp.html"
-    embed_minimal_html(file, views=[widget], title=title)
-    webbrowser.open_new_tab(file)
+
+
+class SimplePlotException(Exception):
+    pass
+
+class PlotLayoutException(Exception):
+    pass
 
 class Singleton:
 
@@ -44,26 +45,109 @@ class Singleton:
 
 line_mode = Namespace(line='lines', marker='markers', both='lines+markers')
 
-def __listdepth__(x):
-    try:
-        return __listdepth__(x[0]) + 1
-    except:
+def __layout__(): #default plot layout
+    return {'plot_bgcolor':'white',
+            'xaxis':{'ticks':'outside', 'showgrid':False, 'showline':True, 'mirror':True, 'linewidth':2, 'linecolor':'black'},
+            'yaxis':{'ticks':'outside', 'showgrid':False, 'showline':True, 'mirror':True, 'linewidth':2, 'linecolor':'black'}}
+
+def __layout_noaxis__(): #plot layout without axes
+    return {'xaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False},
+            'yaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False}}
+
+def __line_mode__(mode):
+    assert mode in line_mode.__dict__.values()
+    if not isinstance(mode, (list, tuple)):
+        mode = Singleton(mode)
+    return mode
+
+def __listdepth__(x): #get depth of a nested list
+    if hasattr(x, "__getitem__"):
+        try:
+            return __listdepth__(x[0]) + 1
+        except:
+            return 1 #the list is empty, but its still a list!
+    else:
         return 0
 
-def __legend__(legend, size):
+def __legend__(legend, size): #default legend
     if legend is not None:
         assert isinstance(legend, (list, tuple))
         return legend
     else:
         return range(1, size + 1)
 
-def __layout__():
-    return {'xaxis':{'ticks':'outside', 'showgrid':False, 'showline':True, 'mirror':True, 'linewidth':2, 'linecolor':'black'},
-            'yaxis':{'ticks':'outside', 'showgrid':False, 'showline':True, 'mirror':True, 'linewidth':2, 'linecolor':'black'}}
 
-def __layout_noaxis__():
-    return {'xaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False},
-            'yaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False}}
+class SimplePlot:
+    
+    def __init__(self, x,y, legend=None, mode=line_mode.marker):
+        if y is None:
+            raise SimplePlotException("argument y cannot be None.")
+
+        x, y = self.__validate__(x, y)
+
+        mode = __line_mode__(mode)
+        legend = __legend__(legend, len(x))
+        layout = __layout__()
+
+        fig = go.Figure(layout=layout)
+
+        for i, xi, yi in zip(range(len(x)), x, y):
+            fig.add_trace(go.Scatter(x=xi, y=yi, mode=mode[i], name=legend[i]))
+
+        fig.update_layout(plot_bgcolor='white')
+        self.fig = fig
+
+    def display(self):
+        self.fig.show()
+    
+    def update(self, x, y,trace=0):
+        pass
+
+    def extend(self, x, y, trace=0):
+        assert len(x) == len(y)
+        self.fig.data[trace].x += tuple(x)
+        self.fig.data[trace].y += tuple(y)
+
+        #self.fig.x[trace] += x
+        #self.fig.y[trace] += y
+
+    def __validate__(self, x, y):
+        if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
+            if x.shape != y.shape:
+                raise SimplePlotException("Invalid shapes: {0},{1} for x,y arguments: shapes must be equal".format(x.shape, y.shape))
+            if len(x.shape) == 1:
+                # a single trace has been provided
+                x = x[np.newaxis, :]
+                y = y[np.newaxis, :]
+                if len(x.shape) != 2:
+                    raise SimplePlotException("Invalid shapes: {0},{1} for x,y arguments: shapes must be in (B,N) format,".format(x.shape,y.shape)
+                                                + "\n where B is the number of traces and N is the size of each trace.")
+        elif isinstance(x, (list, tuple)) and isinstance(y, (list, tuple)):
+            #multiple traces have been given
+            xdepth = __listdepth__(x)
+            ydepth = __listdepth__(y)
+            if xdepth != ydepth:
+                raise SimplePlotException("Invalid list depth: {0},{1} for x,y arguments: depths must be equal.".format(xdepth,ydepth))
+            if not (1 <= xdepth <= 2):
+                raise SimplePlotException("Invalid list depth: {0},{1} for x,y arguments: depths must be 1 or 2.".format(xdepth, ydepth))
+            if xdepth == 1:
+                # a single trace has been given
+                x = [x]
+                y = [y]
+        return x,y
+
+    
+        
+
+
+def show_widget(widget, title="widget"):
+    path = os.getcwd() + ".plot/"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    file = path + "temp.html"
+    embed_minimal_html(file, views=[widget], title=title)
+    webbrowser.open_new_tab(file)
+
 
 def plot_coloured(x, y, z, bins=10, fig=None, row=None, col=None, show=True): #TODO rename this...?
     '''
@@ -90,6 +174,10 @@ def plot_coloured(x, y, z, bins=10, fig=None, row=None, col=None, show=True): #T
     if show:
         fig.show()
     return fig
+
+
+
+
 
 def plot(x, y, mode = line_mode.line, legend=None, show=True):
     if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
