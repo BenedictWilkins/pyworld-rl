@@ -202,11 +202,11 @@ class GymIteratorMeta(type):
 
     def __new__(mcls, name, bases, local):
         step_properties = {k:v for k,v in StepMeta.__dict__.items() if isinstance(v, property)}
-        print(step_properties)
+        #print(step_properties)
 
         step_properties = {k:property(lambda self, p=v: GymIteratorMeta.set_step_transform(self, p)) for k,v in step_properties.items()}
         
-        print(step_properties)
+        #print(step_properties)
         local.update(step_properties)
         #print(local)
         return super(GymIteratorMeta, mcls).__new__(mcls, name, bases, local)

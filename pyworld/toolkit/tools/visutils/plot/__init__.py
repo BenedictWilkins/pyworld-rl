@@ -65,8 +65,7 @@ def __listdepth__(x): #get depth of a nested list
         try:
             return __listdepth__(x[0]) + 1
         except:
-            return 1 #the list is empty, but its still a list!
-    else:
+            pass
         return 0
 
 def __legend__(legend, size): #default legend
@@ -79,7 +78,7 @@ def __legend__(legend, size): #default legend
 
 class SimplePlot:
     
-    def __init__(self, x,y, legend=None, mode=line_mode.marker):
+    def __init__(self, x, y, legend=None, mode=line_mode.marker):
         if y is None:
             raise SimplePlotException("argument y cannot be None.")
 
@@ -94,22 +93,32 @@ class SimplePlot:
         for i, xi, yi in zip(range(len(x)), x, y):
             fig.add_trace(go.Scatter(x=xi, y=yi, mode=mode[i], name=legend[i]))
 
-        fig.update_layout(plot_bgcolor='white')
+        fig.update_layout(plot_bgcolor='white', margin=dict(t=10,l=10,r=10,b=10))
         self.fig = fig
 
     def display(self):
         self.fig.show()
+
+    def trace(self, x, y, **kwargs):
+        x, y = self.__validate__(x, y)
+        for i, xi, yi in zip(range(len(x)), x, y):
+            self.fig.add_trace(go.Scatter(x=xi, y=yi, **kwargs))
     
-    def update(self, x, y,trace=0):
-        pass
+    def update(self, x, y, trace=0):
+        self.fig.data[trace].x += tuple(x)
+        self.fig.data[trace].y += tuple(y)
 
     def extend(self, x, y, trace=0):
         assert len(x) == len(y)
         self.fig.data[trace].x += tuple(x)
         self.fig.data[trace].y += tuple(y)
-
+        
         #self.fig.x[trace] += x
         #self.fig.y[trace] += y
+
+    def set_data(self, x, y, trace=0):
+        self.fig.data[trace].x = x
+        self.fig.data[trace].y = y
 
     def __validate__(self, x, y):
         if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
@@ -137,17 +146,13 @@ class SimplePlot:
         return x,y
 
     
-        
-
-
-def show_widget(widget, title="widget"):
+def show_widget(widget, title="widget"): #???
     path = os.getcwd() + ".plot/"
     if not os.path.exists(path):
         os.makedirs(path)
     file = path + "temp.html"
     embed_minimal_html(file, views=[widget], title=title)
     webbrowser.open_new_tab(file)
-
 
 def plot_coloured(x, y, z, bins=10, fig=None, row=None, col=None, show=True): #TODO rename this...?
     '''
@@ -241,14 +246,18 @@ def histogram(x, bins=20, legend=None, log_scale=False, fig=None, row=None, col=
         fig.show()
     return fig
 
+def histograms(*x, bins=20, legend=None, log_scale=False, rows=None, cols=None, show=True):
+    subplots.make_subplots(rows=rows, cols=cols)
 
-def histogram_slider(fig, range=range(1,20,1)):
+
+
+def histogram_slider(fig, sizes=range(1,20,1)):
     fig = go.FigureWidget(fig)
     fig.layout.sliders = [dict(
                     active = 10,
                     currentvalue = {"prefix": "bin size: "},
                     pad = {"t": 20},
-                    steps = [dict(label = i, method = 'restyle',  args = ['xbins.size', i]) for i in range]
+                    steps = [dict(label = str(i), method = 'restyle',  args = ['xbins.size', i]) for i in sizes]
                 )]
     return fig
 

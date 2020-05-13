@@ -134,7 +134,7 @@ def resize_all(images, size, interpolation=interpolation.area):
 
 def crop_all(images, xsize=None, ysize=None, copy=False):
     if not len(images.shape) == 4 or not isHWC(images):
-         raise ValueError("invalid image format: {1}, images must be in NHWC format.".format(images.shape))
+         raise ValueError("invalid image format: {0}, images must be in NHWC format.".format(images.shape))
     if xsize is None:
         xsize = (0,images.shape[2])
     if ysize is None:
@@ -215,6 +215,8 @@ def to_float(image):
 def to_integer(image):
     assert is_float(image)
     return (image * 255.).astype(np.uint8) 
+
+
 
 if __name__ == "__main__":
     def test_isHWC():

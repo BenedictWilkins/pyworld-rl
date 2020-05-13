@@ -12,6 +12,7 @@ import json
 import re
 import numpy as np
 import matplotlib.pyplot as plt
+import fnmatch #unix file name matcher
 
 
 try:
@@ -236,8 +237,6 @@ def file(file, force=True, overwrite=False):
     return file
 
 
-
-
 #TODO rename
 def next(file, force=True):
     o_file, ext = os.path.splitext(file)
@@ -303,6 +302,16 @@ def mkdir(path):
 
 def files_with_extention(path, extension, full=False):
     return [file for file in files(path, full=full) if file.endswith(extension)]
+
+def filter(files, blacklist=[], whitelist=[]):
+    for pattern in whitelist:
+        files = fnmatch.filter(files, pattern)
+
+    rfiles = set()
+    for pattern in blacklist:
+        rfiles = rfiles.union(set(fnmatch.filter(files, pattern)))
+
+    return list(set(files) - rfiles)
 
 if __name__ == "__main__":
     save('~/Documents/test.mp4', np.random.uniform(size=(100,200,100, 3)))

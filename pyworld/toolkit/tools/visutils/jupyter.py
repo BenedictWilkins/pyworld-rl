@@ -32,12 +32,16 @@ class SimplePlot(vis_plot.SimplePlot):
         Wrapper around a plotly figure that allows offline updates in Jupyter.
     '''
 
-    def __init__(self, x, y, *args, **kwargs):
-        super(SimplePlot, self).__init__(x,y,*args,**kwargs)
+    def __init__(self, x, y, *args, mode=line_mode.line, legend=None, **kwargs):
+        super(SimplePlot, self).__init__(x, y, *args, mode=mode, legend=legend, **kwargs)
         self.fig = go.FigureWidget(self.fig)
     
     def display(self):
         display(self.fig)
+
+    def on_hover(self, fun, trace=0):
+        self.fig.layout.hovermode = 'closest'
+        self.fig.data[trace].on_hover(fun)
 
 class DynamicPlot(SimplePlot):
 
@@ -46,8 +50,9 @@ class DynamicPlot(SimplePlot):
         self.__cachex = []
         self.__cachey = [] 
         self.__update_after = update_after
+        self.__count = 0
 
-    def extend(self,x,y,trace=0):
+    def extend(self, x, y, trace=0):
         assert len(x) == len(y)
         assert trace == 0 # multiple traces not supported yet
         self.__cachex.extend(x)
@@ -57,34 +62,74 @@ class DynamicPlot(SimplePlot):
             self.__cachex.clear()          
             self.__cachey.clear()
 
+    def update(self, x, y, trace=0):
+        if x is None:
+            x = self.__count
+        self.__cachex.append(x)
+        self.__cachey.append(y)
+        self.__count += 1
+
+        if len(self.__cachex) > self.__update_after:
+            super(DynamicPlot,self).extend(self.__cachex, self.__cachey, trace=trace)
+            self.__cachex.clear()          
+            self.__cachey.clear()
+        
+def histogram(x, bins=20, legend=None, log_scale=False, show=True):
+    fig = vis_plot.histogram(x, bins=bins, legend=legend, log_scale=log_scale, show=False)
+    fig = go.FigureWidget(fig)
+    if show:
+        display(fig)
+    return fig
+
+
 def plot(x,y,mode=line_mode.line,legend=None,show=True):
     plot = SimplePlot(x,y,mode=mode,legend=legend)
     if show:
         plot.display()
     return plot
 
-def dynamic_plot(x=[],y=[],mode=line_mode.line,legend=None,show=True):
-    plot = DynamicPlot(x=x,y=y,mode=mode,legend=legend)
+def scatter(x,y,mode=line_mode.marker,legend=None,show=True):
+    plot = SimplePlot(x,y,mode=mode,legend=legend)
     if show:
         plot.display()
     return plot
 
-def progress(iterator, info=None):
-    f = IntProgress(min=0, max=len(iterator), step=1, value=0) # instantiate the bar
-    print(info)
+def dynamic_plot(x=[],y=[], update_after=100, mode=line_mode.line,legend=None,show=True):
+    plot = DynamicPlot(x=x,y=y, update_after=update_after, mode=mode,legend=legend)
+    if show:
+        plot.display()
+    return plot
+
+def progress(iterator, length=None, info=None):
+    if info is not None:
+        print(info)
+    
+    if length is None:
+        try:
+            length = len(iterator)
+        except:
+            print("Failed determin length of iterator, progress bar failed to display. Please provide the 'length' argument.")
+            for i in iterator:
+                yield i
+            return
+    
+    f = IntProgress(min=0, max=length, step=1, value=0) # instantiate the bar
     display(f)
+
     for i in iterator:
         yield i
         f.value += 1
-
-def scatter_image(x, y, images, scale=1, scatter_colour=None, line_colour=None):
+    
+def scatter_image(x, y, images, scale=1, mode=line_mode.both, scatter_colour=None, line_colour=None, width=None, height=None):
     #images must be in NHWC format
     assert transform.isHWC(images)
 
     if transform.is_float(images):
         images = transform.to_integer(images)
+    
 
-    fig = go.FigureWidget(data=[dict(type='scattergl',x=x,y=y,mode='markers+lines',
+
+    fig = go.FigureWidget(data=[dict(type='scattergl',x=x,y=y,mode=mode,
                 marker=dict(color=scatter_colour),
                 line=dict(color=line_colour))])
     fig.layout.hovermode = 'closest'
@@ -95,8 +140,8 @@ def scatter_image(x, y, images, scale=1, scatter_colour=None, line_colour=None):
     image_height = '{0}px'.format(int(images.shape[1] * scale))
     images = [transform.to_bytes(image) for image in images]
 
-    image_widget = Image(value=images[0], 
-                        layout=Layout(height=image_height, width=image_width))
+    image_widget = Image(value=images[0], layout=Layout(height=image_height, width=image_width))
+    
     def hover_fn(trace, points, state):
         ind = points.point_inds[0]
         image_widget.value = images[ind]
@@ -105,8 +150,8 @@ def scatter_image(x, y, images, scale=1, scatter_colour=None, line_colour=None):
     #fig.show()
     #print("WHAT")
 
-    box_layout = widgets.Layout(display='flex',flex_flow='row',align_items='center',width='100%')
-    display(HBox([fig, image_widget], layout=box_layout)) #basically... this needs to be done in jupyter..?!]
+    #box_layout = widgets.Layout(display='flex',flex_flow='row',align_items='center',width='100%',height='100%')
+    #display(HBox([fig, image_widget], layout=box_layout)) #basically... this needs to be done in jupyter..?!]
     return fig, image_widget
 
 
@@ -119,11 +164,14 @@ class SimpleImage:
 
         self.__canvas = Canvas(width=self.__image.shape[1], height=self.__image.shape[0], scale=1)
         self.__canvas.put_image_data(self.__image, 0, 0)  
+        
+    @property
+    def fig(self):
+        return self.__canvas
 
     def transform(self, image):
-        assert transform.isHWC(image)
-
-        #TODO refactor..
+        if not transform.isHWC(image):
+            raise ValueError("Image must be in HWC format")
 
         if transform.is_integer(image):
             image = transform.to_float(image)
@@ -155,22 +203,31 @@ class SimpleImage:
     def scale(self):
         raise NotImplementedError("TODO scale the image?")
 
+def layout_horizontal(*figs):
+    box_layout = widgets.Layout(display='flex',flex_flow='row',align_items='center',width='100%')
+    return HBox(figs, layout=box_layout)
+
+def layout_vertical(*figs):
+    box_layout = widgets.Layout(display='flex',flex_flow='col',align_items='center',width='100%')
+    return VBox(figs, layout=box_layout)
+
+def text(value='text', size=1):
+    return HTML("<h{1}>{0}</h{1}>".format(value, str(size)))
 
 def image(image, scale=1, interpolation=transform.interpolation.nearest, show=True):
     image_widget = SimpleImage(image, scale=scale, interpolation=interpolation)
     if show:
         image_widget.display()
-
     return image_widget
 
-def images(images, scale=1, interpolation=transform.interpolation.nearest, show=True):
-    print(images[0].shape)
+def images(images, scale=1, on_interact=lambda x: None, step=1, value=0, interpolation=transform.interpolation.nearest, show=True):
     image_widget = SimpleImage(images[0], scale=scale, interpolation=interpolation)
 
     def slide(x):
         image_widget.set_image(images[x])
+        on_interact(x)
 
-    interact(slide, x=IntSlider(min=0, max=len(images)-1, step=1, value=0))
+    interact(slide, x=IntSlider(min=0, max=len(images)-1, step=step, value=value, layout=dict(width='99%'))) #width 100% makes a scroll bar appear...?
     if show:
         image_widget.display()
     return image_widget

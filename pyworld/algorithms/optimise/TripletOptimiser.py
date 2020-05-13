@@ -131,10 +131,10 @@ class PairTripletOptimiser(TripletOptimiser):
         xp = torch.diag(d).unsqueeze(1)
         xn = d # careful with the diagonal?
 
-        if topk_n and self.k < xn.shape[0]:
-            #remove xp - xn = 0, along  
-            xn[range(d.shape[0]), range(d.shape[1])] = float('inf') #hopefully this doesnt mess up autograd...
-            xn = self.topk2(d, self.k, large=False) #select the k best negative values for each anchor [batch_size x k]
+        #if topk_n and self.k < xn.shape[0]:
+        #    #remove xp - xn = 0, along  
+        #    xn[range(d.shape[0]), range(d.shape[1])] = float('inf') #hopefully this doesnt mess up autograd...
+        #    xn = self.topk2(d, self.k, large=False) #select the k best negative values for each anchor [batch_size x k]
 
         # is doesnt matter if xp is included in xn as xp_i - xn_i = 0, the original inequality is satisfied, the loss will be 0.
         # it may be more expensive to remove these values than to just compute as below.
@@ -143,24 +143,13 @@ class PairTripletOptimiser(TripletOptimiser):
         #else: this is probably not needed...?
             #xf[:,range(d.shape[0]), range(d.shape[1])] = 0. #remove all ||A-P|| - ||A-P|| #todo
             
-        xf = F.relu(xf + self.margin) 
+        xf = F.relu(xf + self.margin)
         return xf.sum()
 
 class SSTripletOptimiser(PairTripletOptimiser):
 
     def __init__(self, model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005):
         super(SSTripletOptimiser, self).__init__(model, margin, mode, k, lr)
-
- 
-
-    def state_state_distance(self, episode, batch_size=256):
-        self.model.eval()
-        z = tu.collect(self.model, episode, batch_size=batch_size) #how much memory has the gpu got?!
-        self.model.train()
-        #L22 distance by default? TODO give some other options for this
-        z1 = z[:-1]
-        z2 = z[1:]
-        return z, ((z1 - z2) ** 2).sum(1)
 
 class SASTripletOptimiser(TripletOptimiser):
 

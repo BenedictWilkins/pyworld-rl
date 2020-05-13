@@ -14,10 +14,12 @@ from ..debugutils import assertion
 
 from . import accumulate
 from . import function
+from . import random
+from . import timeseries
 
 DATASET_REPOSITORY = "/home/ben/Documents/repos/datasets/" #what ever you want...
 
-__all__ = ('accumulate', 'function')
+__all__ = ('accumulate', 'function', 'random', 'timeseries')
 
 ''' #meh remove them...
 def arg(args, name, default):
@@ -35,6 +37,9 @@ def exit_on(iterator, on):
 '''
 
 from .batch import batch_iterator
+
+
+
 
 
 def window(x, shape):
