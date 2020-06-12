@@ -27,9 +27,7 @@ sars = namedtuple('sars', ['state', 'action', 'reward', 'nstate'])
 sars.__new__.__defaults__ = (None,None,None,None)
 '''
 
-from functools import wraps
-
-from ..visutils import transform as T
+import numpy as np
 
 class observation:
     
@@ -44,6 +42,9 @@ class observation:
 
     def __str__(self):
         return "observation-{0}".format(self.__class__.__name__)
+
+    def __repr__(self):
+        return str(self)
 
 class s(observation):
     
@@ -175,16 +176,11 @@ class sars(observation):
     @property
     def nstate(self):
         return self[3] 
-    
-if __name__ == "__main__":
-    import numpy as np
 
-    state = np.random.randint(0,255,size=(3,10,10))
-    
-    obs = s.CHW(state)
-
-    for a in obs:
-        print(a)
-    print(obs)
-
-    #print(obs)
+def pack(observations):
+    """ 
+        Packs a list of observations into a list of numpy arrays (one for each observation attribute)
+    Args:
+        (numpy.ndarray, ...) : one ndarray for each observation
+    """
+    return tuple([np.array(d) for d in [i for i in zip(*observations)]])

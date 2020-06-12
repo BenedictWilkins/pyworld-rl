@@ -5,6 +5,7 @@ Created on Wed Nov 27 14:35:59 2019
 
 author: Benedict Wilkins
 """
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -19,10 +20,11 @@ class AEOptimiser(TorchOptimiser):
         super(AEOptimiser, self).__init__(ae, base_optimiser=torch.optim.Adam(ae.parameters(), lr=lr))
         self.__loss = loss
         self.cma = CMA(loss.__name__)
-        #self.__loss = torch.nn.MSELoss(reduction='sum')
        
-    def step(self, x):
-        loss = self.__loss(self.model(x), x.to(self.model.device))
+    def step(self, x, y=None):
+        if y is None:
+            y = x
+        loss = self.__loss(self.model(x), y.to(self.model.device))
         self.cma.push(loss.item())
         return loss
 

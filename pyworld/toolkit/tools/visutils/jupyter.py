@@ -46,23 +46,57 @@ class SimplePlot(vis_plot.SimplePlot):
 class DynamicPlot(SimplePlot):
 
     def __init__(self, x=[], y=[], update_after=100, *args, **kwargs):
-        super(DynamicPlot, self).__init__(x,y,*args,**kwargs)
+        """ Create a dynamic plot that can be updated with new data.
+
+        Args:
+            x (list, optional): x data. Defaults to [].
+            y (list, optional): y data. Defaults to [].
+            update_after (int, optional): number of updates before replot. Defaults to 100.
+        """
+        super(DynamicPlot, self).__init__(x, y, *args,**kwargs)
         self.__cachex = []
         self.__cachey = [] 
         self.__update_after = update_after
         self.__count = 0
 
-    def extend(self, x, y, trace=0):
+    def length(self, trace=0):
+        return super(DynamicPlot, self).length(trace=trace) + len(self.__cachex)
+
+    def extend(self, x=None, y=None, trace=0):
+        """ Update this plot with new data (appends to the end of the trace). If x is left as None, the trace size is used.
+
+        Args:
+            x (iterable, optional): x data. Defaults to current trace size.
+            y (iterable): y data.
+            trace (int, optional): to update. Defaults to 0.
+
+        """
+        if x is None:
+            x = list(np.arange(self.__count, self.__count + len(y)))
+
+        assert y is not None
         assert len(x) == len(y)
         assert trace == 0 # multiple traces not supported yet
+
         self.__cachex.extend(x)
         self.__cachey.extend(y)
+        self.__count += len(x)
         if len(self.__cachex) > self.__update_after:
             super(DynamicPlot,self).extend(self.__cachex, self.__cachey, trace=trace)
             self.__cachex.clear()          
             self.__cachey.clear()
 
-    def update(self, x, y, trace=0):
+    def append(self, x=None, y=None, trace=0):
+        """ Update this plot with new data (appends to the end of the trace). If x is left as None, the trace size is used.
+
+        Args:
+            x ((int, float), optional): x data. Defaults to current trace size.
+            y ((int, float)): y data.
+            trace (int, optional): to update. Defaults to 0.
+        """
+        assert y is not None
+        assert trace == 0 # multiple traces not supported yet
+
         if x is None:
             x = self.__count
         self.__cachex.append(x)
@@ -73,6 +107,14 @@ class DynamicPlot(SimplePlot):
             super(DynamicPlot,self).extend(self.__cachex, self.__cachey, trace=trace)
             self.__cachex.clear()          
             self.__cachey.clear()
+
+    def update(self, x=None, y=None, trace=0):
+        self.__cachex.clear()
+        self.__cachey.clear()
+        self.__count = len(x)
+        super(DynamicPlot, self).update(x=x,y=y,trace=trace)
+
+
         
 def histogram(x, bins=20, legend=None, log_scale=False, show=True):
     fig = vis_plot.histogram(x, bins=bins, legend=legend, log_scale=log_scale, show=False)
@@ -80,7 +122,6 @@ def histogram(x, bins=20, legend=None, log_scale=False, show=True):
     if show:
         display(fig)
     return fig
-
 
 def plot(x,y,mode=line_mode.line,legend=None,show=True):
     plot = SimplePlot(x,y,mode=mode,legend=legend)
@@ -119,6 +160,8 @@ def progress(iterator, length=None, info=None):
     for i in iterator:
         yield i
         f.value += 1
+
+
     
 def scatter_image(x, y, images, scale=1, mode=line_mode.both, scatter_colour=None, line_colour=None, width=None, height=None):
     #images must be in NHWC format
@@ -126,10 +169,9 @@ def scatter_image(x, y, images, scale=1, mode=line_mode.both, scatter_colour=Non
 
     if transform.is_float(images):
         images = transform.to_integer(images)
-    
 
-
-    fig = go.FigureWidget(data=[dict(type='scattergl',x=x,y=y,mode=mode,
+    fig = go.FigureWidget(data=[dict(type='scattergl',x=x, y=y,
+                mode=mode,
                 marker=dict(color=scatter_colour),
                 line=dict(color=line_colour))])
     fig.layout.hovermode = 'closest'
@@ -152,6 +194,7 @@ def scatter_image(x, y, images, scale=1, mode=line_mode.both, scatter_colour=Non
 
     #box_layout = widgets.Layout(display='flex',flex_flow='row',align_items='center',width='100%',height='100%')
     #display(HBox([fig, image_widget], layout=box_layout)) #basically... this needs to be done in jupyter..?!]
+
     return fig, image_widget
 
 
@@ -163,15 +206,17 @@ class SimpleImage:
         self.__image = self.transform(image)
 
         self.__canvas = Canvas(width=self.__image.shape[1], height=self.__image.shape[0], scale=1)
-        self.__canvas.put_image_data(self.__image, 0, 0)  
+        self.__canvas.put_image_data(self.__image, 0, 0) 
         
     @property
     def fig(self):
         return self.__canvas
 
     def transform(self, image):
-        if not transform.isHWC(image):
-            raise ValueError("Image must be in HWC format")
+        if transform.isCHW(image) and not transform.isHWC(image):
+            image = transform.HWC(image) #transform to HWC format for display...
+        elif not transform.isHWC(image):
+            raise ValueError("Argument: \"image\" must be in HWC format")
 
         if transform.is_integer(image):
             image = transform.to_float(image)
@@ -186,7 +231,11 @@ class SimpleImage:
         return transform.to_integer(image) #finally transform to int
 
     def display(self):
-        display(self.__canvas)
+        box_layout = widgets.Layout(display='flex',flex_flow='row',align_items='center',width='100%')
+        display(HBox([self.__canvas], layout=box_layout))
+
+    def update(self, image):
+        self.set_image(image)
 
     def set_image(self, image):
         #TODO if this is live there might be problems... give the option of preprocessing via transform
@@ -220,8 +269,17 @@ def image(image, scale=1, interpolation=transform.interpolation.nearest, show=Tr
         image_widget.display()
     return image_widget
 
-def images(images, scale=1, on_interact=lambda x: None, step=1, value=0, interpolation=transform.interpolation.nearest, show=True):
+
+
+
+def images(images, scale=1, on_interact=lambda x: None, step=1, value=0, window=1, interpolation=transform.interpolation.nearest, show=True):
     image_widget = SimpleImage(images[0], scale=scale, interpolation=interpolation)
+    
+    if hasattr(on_interact, '__getitem__'):
+        l = on_interact
+        def list_on_interact(z):
+            print("value:", l[z]) #this only works with later version of ipython?
+        on_interact = list_on_interact
 
     def slide(x):
         image_widget.set_image(images[x])

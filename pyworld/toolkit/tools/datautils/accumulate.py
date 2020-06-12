@@ -153,19 +153,17 @@ class CMA:
     
     def recent(self):
         if len(self.labels) > 0:
-            return {self.labels[i]:self._x[i] for i in range(len(self.labels))} #get the most recent values that was pushed
+            return {self.labels[i]:self._x[i] for i in range(len(self.labels))} #get the most recent values that were pushed
         else:
             return self._x
     
     def reset(self):
-        if len(self.labels) > 0:
-            self._m = np.zeros(len(self.labels))
-        else:
-            self._m = 0
+        self._m = 0
         self._n = 0
         self._x = None
         
     def labelled(self):
+        assert(self._n > 0)
         return {self.labels[i]:self._m[i] for i in range(len(self.labels))}
     
     def __str__(self):

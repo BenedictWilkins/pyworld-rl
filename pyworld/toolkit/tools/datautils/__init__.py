@@ -16,10 +16,11 @@ from . import accumulate
 from . import function
 from . import random
 from . import timeseries
+from . import stat
 
 DATASET_REPOSITORY = "/home/ben/Documents/repos/datasets/" #what ever you want...
 
-__all__ = ('accumulate', 'function', 'random', 'timeseries')
+__all__ = ('accumulate', 'function', 'random', 'timeseries', 'stat')
 
 ''' #meh remove them...
 def arg(args, name, default):
@@ -37,8 +38,6 @@ def exit_on(iterator, on):
 '''
 
 from .batch import batch_iterator
-
-
 
 
 

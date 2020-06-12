@@ -14,6 +14,6 @@ Created on Tue Mar 19 13:12:44 2019
 
 from . import algorithms
 from . import toolkit
-from . import environments
+from . import environment
 
-__all__ = ('environments', 'toolkit', 'algorithms')
+__all__ = ('environment', 'toolkit', 'algorithms')

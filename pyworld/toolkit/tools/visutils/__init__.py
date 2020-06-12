@@ -347,6 +347,23 @@ def gallery(images, cols=3):
               .reshape(height*nrows, width*cols, intensity))
     return result
 
+def hgallery(x, n=None):
+    assert transform.isHWC(x)
+
+    if n is None:
+        n = images.shape[0]
+    m,h,w,c = x.shape
+    n = min(m, n) #if n is larger, just use m
+    if m % n != 0:
+        pad = ((0, n - (m % n)),*([(0,0)]*(len(x.shape)-1)))
+        x = np.pad(x, pad)
+        m,h,w,c = x.shape
+        
+    return x.swapaxes(1,2).reshape(m//n, w * n, h, c).swapaxes(1,2)
+
+
+
+
 
 def show(image, name='image'):
     '''

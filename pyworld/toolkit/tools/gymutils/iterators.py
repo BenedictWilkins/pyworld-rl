@@ -12,10 +12,10 @@ from functools import wraps
 
 from . import wrappers
 from . import mode as m
-from .policy import uniform_random_policy
 
+
+from . import policy as P
 from ..visutils import transform as T
-
 
 def _d_CHW(func):
     @wraps(func)
@@ -91,102 +91,6 @@ class Step(metaclass=StepMeta):
     def reset(self, *_):
         return (self.env.reset(),)
 
-# ============== ITERATORS ============== #
-
-def s_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    yield m.s(state), False
-    done = False
-    while not done:
-        action = policy(state)
-        state, _, _, done, _ = step.step(action)
-        yield m.s(state), done
-        
-def r_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        state, _, reward, done, _ = step.step(action)
-        yield m.r(reward), done
-        
-def sa_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        nstate, action, _, done, _ = step.step(action)
-        yield m.sa(state, action), False
-        state = nstate
-        print(done)
-    #print(state, policy(state))
-    print(True)
-    yield m.sa(state, action), True
-        
-def sr_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        nstate, _, reward, done, _ = step.step(action)
-        yield m.sr(state, reward), done
-        state = nstate
-    #yield m.sr(state, 0.), True #?? maybe..
-        
-def ss_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        nstate, _, _, done, _ = step.step(action)
-        yield m.ss(state, nstate), done
-        state = nstate
-
-def sar_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        nstate, action, reward, done, _ = step.step(action)
-        yield m.sar(state, action, reward), done
-        state = nstate
-    
-def ars_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    yield m.ars(None, None, state), False ##??
-    done = False
-    while not done:
-        action = policy(state)
-        state, action, reward, done, _ = step.step(action)
-        yield m.ars(action, reward, state), done
-
-def sas_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        nstate, action, _, done, _ = step.step(action)
-        yield m.sas(state, action, nstate), done
-        state = nstate
-
-def sars_iterator(env, policy, step=Step):
-    step = step(env)
-    state, = step.reset()
-    done = False
-    while not done:
-        action = policy(state)
-        nstate, action, reward, done, _ = step.step(action)
-        yield m.sars(state, action, reward, nstate), done
-        state = nstate
-
 class GymIteratorMeta(type):
 
     '''
@@ -219,47 +123,157 @@ class GymIteratorMeta(type):
 
 class GymIterator(metaclass=GymIteratorMeta):
 
-    def __init__(self, env, policy=None, mode=m.s, onehot=False, episodic=True):
-        self.episodic = episodic
-        self._done = False
+    def __init__(self, env, policy=None, mode=m.s):
         self._step_transform = Step
+
+        assert mode in iterators
         self._mode = mode
         
-        if onehot:
-            env = wrappers.OnehotUnwrapper(env)
+        #if onehot:
+        #    env = wrappers.OnehotUnwrapper(env)
+            
         self._env = env
 
         if policy is None:
-            policy = uniform_random_policy(env.action_space, onehot=onehot)
+            policy = P.uniform(env.action_space)
+
         self._policy = policy
         
         self._iterator_type = iterators[self._mode]
         self._iterator = None
 
-    def reset(self):
-        self._done = False
-    
-    def __getitem__(self, _slice):
-        return itertools.islice(self, _slice.start, _slice.stop, _slice.step)
-    
-    def __next__(self):
-        if self.episodic:
-            #print(self.episodic)
-            result, _ = next(self._iterator)
-            return result
-        else:
-            try:
-                result, done = next(self._iterator) #TODO remove done..
-                return result
-            except StopIteration:
-                self.reset()
-                result, done = next(self._iterator)
-                return result
-        
     def __iter__(self):
+        self._env.reset()
         self._iterator = self._iterator_type(self._env, self._policy, self._step_transform)
-        return self
+        return self._iterator
+
+
+def dataset(env, policy=None, mode=m.s, size=10000):
+    pass #TODO
+
+def episode(env, policy=None, mode=m.s, max_length=10000):
+    '''
+        Creates an episode from the given environment and policy.
+        Arguments:
+            env: to play
+            policy: to select actions from - a function with signature: action = policy(state)
+            mode: one of `gyutils.mode`, default to state
+            max_length: number of environment steps before the episode is cut short.
+    '''
+    iterator = GymIterator(env, policy, mode)
+    iterator = itertools.islice(iterator, 0, max_length)
+    return m.pack(iterator)
+  
+def episodes(env, policy, mode=m.s, max_length=10000, n=10):
+    '''
+        TODO
+
+        Example:
+            for episode in episodes(env, policy):
+                # do something with the episode
+    '''
+    iterator = GymIterator(env, policy, mode)
+    for i in range(n):
+        _iterator = itertools.islice(iterator, 0, max_length)
+        yield m.pack(_iterator)
+
+# ============================ ITERATORS ============================ #
+# Each iterator corresponds to a mode in gymutils.mode, and is used to gather states, 
+# actions, and/or rewards.
+# =================================================================== #
+
+def s_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    yield m.s(state)
+    done = False
+    while not done:
+        action = policy(state)
+        state, _, _, done, _ = step.step(action)
+        yield m.s(state)
+        
+def r_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        state, _, reward, done, _ = step.step(action)
+        yield m.r(reward)
+        
+def sa_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, action, _, done, _ = step.step(action)
+        yield m.sa(state, action)
+        state = nstate
+    #print(state, policy(state))
+    yield m.sa(state, action)
+        
+def sr_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, _, reward, done, _ = step.step(action)
+        yield m.sr(state, reward)
+        state = nstate
+    #yield m.sr(state, 0.), True #?? maybe..
+        
+def ss_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, _, _, done, _ = step.step(action)
+        yield m.ss(state, nstate)
+        state = nstate
+
+def sar_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, action, reward, done, _ = step.step(action)
+        yield m.sar(state, action, reward)
+        state = nstate
     
+def ars_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    yield m.ars(None, None, state)
+    done = False
+    while not done:
+        action = policy(state)
+        state, action, reward, done, _ = step.step(action)
+        yield m.ars(action, reward, state)
+
+def sas_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, action, _, done, _ = step.step(action)
+        yield m.sas(state, action, nstate)
+        state = nstate
+
+def sars_iterator(env, policy, step=Step):
+    step = step(env)
+    state, = step.reset()
+    done = False
+    while not done:
+        action = policy(state)
+        nstate, action, reward, done, _ = step.step(action)
+        yield m.sars(state, action, reward, nstate)
+        state = nstate
+
 iterators = {m.s:s_iterator, m.r:r_iterator, m.sa:sa_iterator, m.ss:ss_iterator, m.sr:sr_iterator, 
              m.sar:sar_iterator, m.ars:ars_iterator, m.sas:sas_iterator, 
              m.sars:sars_iterator}

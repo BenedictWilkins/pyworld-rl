@@ -30,6 +30,7 @@ class AE(nn.Module):
         return self.encoder(x)
     
     def decode(self, z):
+        z = z.to(self.device)
         return self.decoder(z)
         
     def forward(self, x):
@@ -50,13 +51,15 @@ def default_conv2d(input_shape):
     
     return layers, [s1, s2, s3]
 
-def default2D(input_shape, latent_shape, share_weights=True):
+def default2D(input_shape, latent_shape, output_activation=nn.Identity(), share_weights=True, **kwargs):
     '''
         Constructs the default (convolutional) encoder and decoder for use in an AE.
         Arguments:
             input_shape (tuple): in CHW format
             latent_shape (int): latent space dimension
             share_weights (bool): whether the encoder and decoder share weights
+        Returns:
+            encoder, decoder
     '''
     input_shape = tu.as_shape(input_shape)
     latent_shape = tu.as_shape(latent_shape)
@@ -89,12 +92,13 @@ def default2D(input_shape, latent_shape, share_weights=True):
             self.conv1 = inverse_layers[1]
             self.conv2 = inverse_layers[2]
             self.conv3 = inverse_layers[3]
+            self.output_activation = output_activation
 
         def forward(self, x):
             x_ = F.leaky_relu(self.linear1(x)).view(x.shape[0], *shapes[-1])
             x_ = F.leaky_relu(self.conv1(x_))
             x_ = F.leaky_relu(self.conv2(x_))
-            x_ = self.conv3(x_)
+            x_ = self.output_activation(self.conv3(x_))
             return x_
         
     return Encoder(), Decoder()

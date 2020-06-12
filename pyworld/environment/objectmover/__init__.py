@@ -55,7 +55,7 @@ class ObjectMover(gym.Env):
         self.action_labels = {0:'NORTH', 1:'SOUTH', 2:'EAST', 3:'WEST', 4:'NONE'}
 
         self.action_space = gym.spaces.Discrete(4 + int(none_action))
-        self.observation_space = gym.spaces.Box(low=0., high=1., shape=shape, dtype=np.float32)
+        self.observation_space = gym.spaces.Box(low=np.float32(0.), high=np.float32(1.), shape=shape, dtype=np.float32)
         
     def sample_step(self, position, policy):
         self.obj.pos = position
@@ -65,6 +65,27 @@ class ObjectMover(gym.Env):
         action = policy(state)
         nstate, action, _, _ = self.step(action)
         return state, 0., nstate
+
+    def cover(self, x=100, y=100):
+        """ 
+            Returns all posssible states of the game.
+        """
+        y = min(y, self.observation_space.shape[1] + 1)
+        x = min(x, self.observation_space.shape[2] + 1)
+
+        y_space = np.linspace(0,self.observation_space.shape[1], num=x)
+        x_space = np.linspace(0,self.observation_space.shape[2], num=y)
+        x, y = np.meshgrid(x_space, y_space)
+        z = np.empty((x.size, *self.observation_space.shape), dtype=self.observation_space.dtype)
+
+        for i, c in enumerate(zip(x.flatten(), y.flatten())):
+            self.obj.pos = c
+            self.__place()
+            z[i] = self.state
+
+        return z
+
+
         
     def step(self, action):
 #        print(action)
@@ -81,6 +102,7 @@ class ObjectMover(gym.Env):
         miny = 0
         maxx = self.state.shape[2] - self.obj.img.shape[2]
         maxy = self.state.shape[1] - self.obj.img.shape[1]
+    
         
         return x == minx or y == miny or x == maxx or y == maxy
     

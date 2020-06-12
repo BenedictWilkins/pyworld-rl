@@ -55,16 +55,38 @@ def perspective(image, p1, p2):
     M = cv2.getPerspectiveTransform(p1, p2)
     dst = cv2.warpPerspective(image, M, (image.shape[1], image.shape[0]))
 
-def gray(image, components=(0.299, 0.587, 0.114)): #(N)HWC format
-    return (image[...,0] * components[0] + image[...,1] * components[1] + image[...,2] * components[2])[...,np.newaxis]
+def gray(image, components=(0.299, 0.587, 0.114), **kwargs): #(N)HWC format
+    """ Convrt images to gray-scale according to the given components. Image must be in (N)HWC format.
 
+    Args:
+        image (ndarray): an image in HWC format
+        components (tuple, optional): scale components for colour channels. Defaults to (0.299, 0.587, 0.114).
+
+    Raises:
+        ValueError: if the image is not in a valid format.
+
+    Returns:
+        ndarray: gray scaled iamge(s)
+    """
+    if not isHWC(image):
+        raise ValueError("image(s) must be in HWC@: format.")
+
+    if image.shape[-1] != 3:
+        raise ValueError("image must be in RGB or BGR format (alpha channel not supporte")
+
+    return (image[...,0] * components[0] + image[...,1] * components[1] + image[...,2] * components[2])[...,np.newaxis].astype(image.dtype)
+    
+     
 def colour(image):
     return cv2.cvtColor(image.squeeze(), cv2.COLOR_GRAY2RGB)
 
-def binary(image, threshold=0.5):
-    indx = image > threshold
-    image[indx] = 1.
-    image[np.logical_not(indx)] = 0.
+def binary(image, threshold=0.5, **kwargs):
+    i = (int(is_integer(image)))
+    m = (1.,255)[i]
+    t = (threshold, 255 * threshold)[i]
+    indx = image > t
+    image[indx] = m
+    image[np.logical_not(indx)] = 0
     return image
 
 def to_bytes(image, ext='.png'):
@@ -149,21 +171,26 @@ def crop_all(images, xsize=None, ysize=None, copy=False):
     return image_c
 
 
+def __format_to_index__(format): # default format is HWC
+    (format.index("H"), format.index("W"), format.index("C"))
+
+
 def __is_channels__(axes):
     return axes == 1 or axes == 3 or axes == 4
 
-def isCHW(image):
+def isCHW(image): # weak check
     '''
         Is the given image in HWC or NHWC.
         Arguments:
             image: to check
     '''
     C_index = 4 - len(image.shape)
-    if C_index in [0,1] and __is_channels__(image.shape[C_index]):
+ 
+    if C_index in [0,1] and __is_channels__(image.shape[1-C_index]):
         return True
     return False
 
-def isHWC(image):
+def isHWC(image): #weak check
     '''
         Is the given image in HWC or NHWC.
         Arguments:
@@ -215,8 +242,6 @@ def to_float(image):
 def to_integer(image):
     assert is_float(image)
     return (image * 255.).astype(np.uint8) 
-
-
 
 if __name__ == "__main__":
     def test_isHWC():

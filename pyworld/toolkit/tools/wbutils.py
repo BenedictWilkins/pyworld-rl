@@ -10,19 +10,6 @@ Created on Fri Jul  5 15:36:14 2019
 
 import os
 import re
-
-'''
-#doesnt work... why not :(
-if 'WB_ONLINE' in globals():
-    __WANDB_MODE = {'offline':'dryrun', 'online':'run'}
-    mode = globals()['WB_ONLINE']
-    assert isinstance(mode, bool) #WANDB_ONLINE must be a boolean
-    if mode:
-        os.environ['WANDB_MODE'] = __WANDB_MODE['online']
-    else:
-        os.environ['WANDB_MODE'] = __WANDB_MODE['offline']
-'''
-
 import wandb
 import torch
 
@@ -123,6 +110,13 @@ class WB:
         if id is None:
             id = fu.file_datetime()
         self.__step = 0
+
+        if not isinstance(config, dict):
+            try:
+                config = vars(config) #e.g. SimpleNamespace
+            except:
+                raise ValueError("Invalid argument: \"config\", should be of type dict.")
+
         config['model_class'] = self.model.__class__.__name__
 
         wandb.init(project=project, id=id, config=config, **options)

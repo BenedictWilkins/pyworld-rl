@@ -11,6 +11,10 @@ from . import visutils
 from . import datautils
 from . import torchutils
 from . import fileutils
+from . import ipython
+
 from .debugutils import assertion
 
-__all__ = ('gymutils', 'visutils', 'datautils', 'torchutils', 'fileutils', 'assertion')
+
+__all__ = ('gymutils', 'visutils', 'datautils', 'torchutils', 'fileutils', 'ipython', 'assertion')
+

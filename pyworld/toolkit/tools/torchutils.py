@@ -3,18 +3,22 @@
 """
 Created on Wed Jun 12 10:44:12 2019
 
-@author: ben
+@author: Benedict Wilkins
+
 """
 
-try:
-    import torch
-except:
-    print("WARNING: MODULE NOT FOUND: torch")
+
+import torch
 
 import numpy as np
 import math  
 
 from . import datautils as du 
+
+
+
+
+
 
 def as_shape(shape):
     if isinstance(shape, tuple):
@@ -25,6 +29,9 @@ def as_shape(shape):
         return (shape,)
     else:
         raise ValueError("Invalid shape argument: {0}".format(str(shape)))
+
+def identity(*args): # there is no identity in torch.nn.F ? use this as a placeholder
+    return args
 
 def collect(model, *data, batch_size=128):
     with torch.no_grad():
@@ -70,9 +77,9 @@ def to_numpy(x):
 
 def to_numpyf(model):
     '''
-        Use: Wraps the output of a function (model) to a numpy array using numpy(x).
+        Wraps the output of a function (model) to a numpy array using to_numpy(model(x)).
     '''
-    return lambda *x: to_numpy(model(*x))
+    return lambda *x, **k: to_numpy(model(*x, **k))
 
 def to_torch(x):
     if torch.is_tensor(x):

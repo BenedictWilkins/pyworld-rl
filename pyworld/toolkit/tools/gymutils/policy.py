@@ -5,7 +5,12 @@ Created on Mon Nov 25 13:04:25 2019
 
 author: Benedict Wilkins
 """
+from abc import ABC, abstractmethod
 import numpy as np
+import gym
+
+from . import spaces
+
 
 class value:
     
@@ -23,19 +28,64 @@ class value:
         def __call__(self, v):
             return v / v.sum()
 
-def onehot(action, n):
-    action_onehot = np.zeros(n)
-    action_onehot[action] = 1
-    return action_onehot
+class Policy(ABC):
 
-def onehot_policy(policy, n):
-    return lambda s: onehot(policy(s), n)
+    def __init__(self, action_space):
+        self.action_space = action_space
+        def _sample(*args, **kwargs):
+            raise NotImplementedError("\"sample\" attribute must be set for abstract class Policy")
+        self.sample = _sample
+    
+    def __call__(self, *args, **kwargs):
+        return self.sample(*args, **kwargs)
 
-def uniform_random_policy(action_space, onehot=False):
-    policy = lambda _: action_space.sample()
-    if onehot:
-        policy = onehot_policy(policy, action_space.n)
+class DiscretePolicy(Policy):
+
+    def __init__(self, action_space, dtype=np.int64):
+        if isinstance(action_space, int):
+            self.action_space = gym.spaces.Discrete(action_space)
+        action_space.dtype = dtype
+        super(DiscretePolicy, self).__init__(action_space)
+
+class ContinuousPolicy(Policy):
+
+    def __init__(self, action_space, dtype=np.float32):
+        action_space.dtype = dtype
+        super(ContinuousPolicy, self).__init__(action_space)
+
+def unonehot(policy, dtype=np.int64):
+    policy.action_space
+
+
+        
+def onehot(policy, dtype=np.float32):
+    assert np.issubdtype(policy.action_space.dtype, np.integer)
+    assert isinstance(policy.action_space, gym.spaces.Discrete)
+
+    sample =  policy.sample
+    policy.action_space = spaces.OneHot(policy.action_space.n, dtype)
+
+    def oh(x):
+        r = np.zeros(policy.action_space.shape[0], dtype=policy.action_space.dtype)
+        r[sample(x)] = 1
+        return r
+    policy.sample = oh
+    
     return policy
+    
+def uniform(action_space, dtype=np.int64):
+    policy = DiscretePolicy(action_space, dtype=dtype)
+    action_space = policy.action_space
+    policy.sample = lambda x=None : action_space.dtype(np.random.randint(0, action_space.n))
+    return policy
+
+
+
+
+
+
+
+# TODO update others to follow DiscretePolicy!
 
 def e_greedy_policy(action_space, critic, epsilon=0.01, onehot=False): 
     def __policy(state):

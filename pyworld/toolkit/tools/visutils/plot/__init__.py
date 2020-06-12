@@ -81,7 +81,7 @@ class SimplePlot:
     def __init__(self, x, y, legend=None, mode=line_mode.marker):
         if y is None:
             raise SimplePlotException("argument y cannot be None.")
-
+        
         x, y = self.__validate__(x, y)
 
         mode = __line_mode__(mode)
@@ -96,25 +96,42 @@ class SimplePlot:
         fig.update_layout(plot_bgcolor='white', margin=dict(t=10,l=10,r=10,b=10))
         self.fig = fig
 
+    def length(self, trace=0):
+        return len(self.fig.data[trace].x)
+
     def display(self):
         self.fig.show()
+
+    def add_hline(self, y):
+        shapes = list(self.fig.layout.shapes)
+        shapes.append(dict(type= 'line', yref= 'y', y0=y, y1=y, xref= 'paper', x0=0, x1=1))
+        self.fig.layout.shapes = shapes
+
+    def add_vline(self, x):
+        shapes = list(self.fig.layout.shapes)
+        shapes.append(dict(type= 'line', yref= 'paper', y0= 0, y1=1, xref= 'x', x0=x, x1=x))
+        self.fig.layout.shapes = shapes
 
     def trace(self, x, y, **kwargs):
         x, y = self.__validate__(x, y)
         for i, xi, yi in zip(range(len(x)), x, y):
             self.fig.add_trace(go.Scatter(x=xi, y=yi, **kwargs))
+
+    def point(self, x, y, **kwargs):
+        kwargs['mode'] = line_mode.marker
+        self.fig.add_trace(go.Scatter(x=[x], y=[y], **kwargs))
     
-    def update(self, x, y, trace=0):
-        self.fig.data[trace].x += tuple(x)
-        self.fig.data[trace].y += tuple(y)
+    def append(self, x, y, trace=0):
+        self.extend(x,y,trace=trace)
 
     def extend(self, x, y, trace=0):
+        assert isinstance(self.fig.data[trace].x, (list, tuple)) and isinstance(self.fig.data[trace].y, (list,tuple))
         assert len(x) == len(y)
         self.fig.data[trace].x += tuple(x)
         self.fig.data[trace].y += tuple(y)
-        
-        #self.fig.x[trace] += x
-        #self.fig.y[trace] += y
+
+    def update(self, x, y, trace=0):
+        self.set_data(x, y, trace=trace)       
 
     def set_data(self, x, y, trace=0):
         self.fig.data[trace].x = x
@@ -137,9 +154,9 @@ class SimplePlot:
             ydepth = __listdepth__(y)
             if xdepth != ydepth:
                 raise SimplePlotException("Invalid list depth: {0},{1} for x,y arguments: depths must be equal.".format(xdepth,ydepth))
-            if not (1 <= xdepth <= 2):
+            if not (0 <= xdepth <= 2):
                 raise SimplePlotException("Invalid list depth: {0},{1} for x,y arguments: depths must be 1 or 2.".format(xdepth, ydepth))
-            if xdepth == 1:
+            if xdepth < 2:
                 # a single trace has been given
                 x = [x]
                 y = [y]
