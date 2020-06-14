@@ -81,7 +81,7 @@ def default2D(input_shape, latent_shape, output_activation=nn.Identity(), share_
             x_ = F.leaky_relu(self.conv1(x))
             x_ = F.leaky_relu(self.conv2(x_))
             x_ = F.leaky_relu(self.conv3(x_)).view(x.shape[0], -1)
-            x_ = F.leaky_relu(self.linear1(x_))
+            x_ = self.linear1(x_)
             return x_
         
     class Decoder(nn.Module):

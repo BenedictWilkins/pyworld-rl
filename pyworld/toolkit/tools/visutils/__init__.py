@@ -31,12 +31,34 @@ from . import plot # plotly
 from . import jupyter #IPython visuals that only work well in jupyter...
 
 
-try:
+try: #TODO move somewhere
     import moviepy.editor as mpy
 except:
     mpy = None
 
 __all__ = ('transform', 'animation', 'detection', 'plot')
+
+def grid(domain, n=100):
+    """ Create a 2D grid of n^2 points over the domain. 
+
+    Args:
+        domain (int, float, tuple): TODO
+        n (int, optional): number of points along each axis. Defaults to 100.
+
+    Raises:
+        NotImplementedError: tuple domain... TODO
+
+    Returns:
+        np.ndarray : points in the grid, shape n^2 x 2
+    """
+    if isinstance(domain, (int, float)):
+        domain = ((-domain/2, domain/2), (-domain/2, domain/2))
+    else:
+        raise NotImplementedError("TODO")
+
+    z1, z2 = np.meshgrid(np.linspace(domain[0][0],domain[0][1],n), np.linspace(domain[1][0],domain[1][1],n))
+    z1, z2 = z1.flatten()[:,np.newaxis], z2.flatten()[:,np.newaxis]
+    return np.concatenate((z1, z2), axis=1)      
 
 def savevideo(iterator, path, extension = ".mp4", fps=30):
     if mpy is not None:
@@ -50,7 +72,7 @@ def savevideo(iterator, path, extension = ".mp4", fps=30):
 
         #clip.write_videofile(path) # default codec: 'libx264', 24 fps
     else:
-        raise ImportError('saving a video requires the module \'moviepy\'.')
+        raise ImportError('saving a video requires the module: \'moviepy\'.')
 
 class track2D:
     

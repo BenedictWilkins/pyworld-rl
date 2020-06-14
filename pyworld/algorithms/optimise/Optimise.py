@@ -43,7 +43,7 @@ class TorchOptimiser(Optimiser):
         return loss.item()
 
     def __str__(self):
-        return 'model:' + type(self.model).__name__  + '\nloss:' + self._loss.__name__ + '\noptimiser:' + str(self.optim)
+        return 'model:' + type(self.model).__name__  + '\noptimiser:' + str(self.base_optimiser)
 
     def __repr__(self):
         return str(self)

@@ -1,10 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 14 12:05:02 2019
+    Created on 12-06-2020 20:00:35
 
-@author: ben
+    Visual utitilies.
 """
+__author__ = "Benedict Wilkins"
+__email__ = "benrjw@gmail.com"
+__status__ = "Development"
 
 from . import gymutils
 from . import visutils
@@ -17,4 +20,6 @@ from .debugutils import assertion
 
 
 __all__ = ('gymutils', 'visutils', 'datautils', 'torchutils', 'fileutils', 'ipython', 'assertion')
+
+ 
 

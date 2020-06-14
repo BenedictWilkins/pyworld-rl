@@ -60,7 +60,7 @@ class ModelFileTorch:
         fu.load(self.path, model=template)
         return template
 
-def load(run, path="./wandb/", replace=False, blacklist=[], whitelist=[]):
+def load(run, path="./wandb/", replace=False, blacklist=[], whitelist=[], detailed=False):
     WANDB_META = "wandb-metadata.json"
     WANDB_MODE = "mode"
     WANDB_RUN = "run"
@@ -89,6 +89,10 @@ def load(run, path="./wandb/", replace=False, blacklist=[], whitelist=[]):
         except:
             return v
     config = {k:value_or(v) for k,v in config.items()}
+    if not detailed:
+        del config['wandb_version']
+        del config['_wandb']
+        #any others?
 
     #pprint(config)
     models = fu.filter(fu.files(path, full=True), whitelist=WANDB_MODEL_EXTS)
