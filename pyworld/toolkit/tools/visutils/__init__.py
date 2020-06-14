@@ -1,10 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 14 11:41:32 2019
+    Created on 14-06-2019 11:41:32
 
-@author: ben
+    [Description]
 """
+__author__ = "Benedict Wilkins"
+__email__ = "benrjw@gmail.com"
+__status__ = "Development"
+
 import cv2
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,8 +21,6 @@ from enum import Enum
 
 from PIL import Image, ImageDraw, ImageFont
 import os
-
-
 
 from .. import fileutils as fu
 from .. import datautils as du

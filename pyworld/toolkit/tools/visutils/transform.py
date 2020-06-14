@@ -229,6 +229,13 @@ def HWC(image): #CV2 FORMAT
     else:
         raise ValueError("invalid dimension: " + str(len(image.shape)))
 
+def BGR(image):
+    raise NotImplementedError("TODO")
+    #return np.flip(image, 2) #flip around channel axis
+
+def RGB(image):
+    raise NotImplementedError("TODO") #flip around channel axis
+
 def is_integer(image):
     return issubclass(image.dtype.type, np.integer)
 
