@@ -12,6 +12,7 @@ import torch.nn.functional as F
 
 from . import AE
 from ...tools import torchutils as tu
+from ..inverse import inverse
 
 def prior_gaussian(size, device='cpu'):
     return torch.as_tensor(np.random.randn(*size), device=device, dtype=torch.float)
@@ -44,7 +45,7 @@ def default2D(input_shape, latent_dim, share_weights=True):
               nn.Conv2d(32, 16, kernel_size=4, stride=1),
               nn.Linear(s3[0] * s3[1] * 16, latent_dim)]
 
-    inverse_layers = AE.construct_inverse(*layers, share_weights=share_weights)
+    inverse_layers = inverse(*layers, share_weights=share_weights)
 
     encoder = AE.Encoder(layers[0], nn.LeakyReLU(0.2, inplace=True), nn.BatchNorm2d(64),
                          layers[1], nn.LeakyReLU(0.2, inplace=True), nn.BatchNorm2d(32),

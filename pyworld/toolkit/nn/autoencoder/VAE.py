@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from . import AE
+from ..inverse import inverse
 from ...tools import torchutils as tu
 
 class VAE(AE.AE):
@@ -46,7 +47,7 @@ def default2D(input_shape, latent_dim, share_weights=True):
     l_logvar = nn.Linear(s3[0] * s3[1] * 16, latent_dim)
     l2 = nn.Linear(latent_dim, s3[0] * s3[1] * 16)
 
-    inverse_layers = AE.construct_inverse(*layers, share_weights=share_weights)
+    inverse_layers = inverse(*layers, share_weights=share_weights)
     
     class Encoder(nn.Module):
         

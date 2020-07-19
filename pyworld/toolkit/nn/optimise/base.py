@@ -1,22 +1,20 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 14 11:22:46 2019
-
-@author: Benedict Wilkins
+    Created on 18-07-2020 17:01:37
 """
 
-try:
-    import torch
-    import torch.nn.functional as F
-    import numpy as np
-except:
-    pass
+__author__ = "Benedict Wilkins"
+__email__ = "benrjw@gmail.com"
+__status__ = "Development"
+
+
+import torch
+import torch.nn.functional as F
+import numpy as np
 
 from collections import defaultdict
 from pyworld.toolkit.tools.datautils.accumulate import EMA, CMA
-
-# !!! DEPRECATED USE pyworld.toolkit.nn.optimise
 
 class Optimiser:
     
@@ -58,7 +56,16 @@ class BCEOptimiser(TorchOptimiser):
     def __init__(self, model, logits=True, base_optimiser=None):
         super(BCEOptimiser, self).__init__(model, base_optimiser=base_optimiser)
         self.__loss_fun = (F.binary_cross_entropy, F.binary_cross_entropy_with_logits)[int(logits)]
+        self.logits = logits
 
     def step(self, x, y):
         z = self.model(x)
         return self.__loss_fun(z, y)
+
+class MSEOptimiser(TorchOptimiser):
+
+    def __init__(self, model, base_optimiser=None):
+        super(MSEOptimiser, self).__init__(model, base_optimiser=base_optimiser)
+
+    def step(self, x, y):
+        return F.mse_loss(self.model(x), y)

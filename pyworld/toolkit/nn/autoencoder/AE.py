@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ...tools import torchutils as tu
-from .inverse import inverse
+from ..inverse import inverse
 
 class AE(nn.Module):
     
@@ -19,24 +19,16 @@ class AE(nn.Module):
         super(AE, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.device = 'cpu'
-        
-    def to(self, device):
-        self.device = device
-        return super(AE, self).to(device)
-    
+  
     def encode(self, x):
-        x = x.to(self.device)
         return self.encoder(x)
     
     def decode(self, z):
-        z = z.to(self.device)
         return self.decoder(z)
         
     def forward(self, x):
-        x = x.to(self.device)
-        z = self.encoder(x)
-        return self.decoder(z)
+        z = self.encode(x)
+        return self.decode(z)
 
 #=============== TODO just use CNet as default? ===================
 

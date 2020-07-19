@@ -18,7 +18,7 @@ import pyworld.toolkit.tools.torchutils as tu
 
 from pyworld.toolkit.tools.datautils.accumulate import CMA #TODO remove
 
-from .Optimise import TorchOptimiser
+from ..base import TorchOptimiser
     
 #TODO most of the self.loss computation of each optimiser should be moved into self.step
 
@@ -142,12 +142,6 @@ class PairTripletOptimiser(TripletOptimiser):
             
         xf = F.relu(xf + self.margin)
         return xf.sum()
-
-class SSTripletOptimiser(PairTripletOptimiser):
-
-    def __init__(self, model, margin = 0.2, mode = mode.all, k = 16, lr=0.0005):
-        super(SSTripletOptimiser, self).__init__(model, margin, mode, k, lr)
-
 
 class SASTripletOptimiser(TripletOptimiser):
 

@@ -6,7 +6,10 @@ Created on Mon Nov 25 13:04:02 2019
 author: Benedict Wilkins
 """
 import gym
-import atari_py as ap
+try:
+    import atari_py as ap
+except:
+    pass
 
 import numpy as np
 

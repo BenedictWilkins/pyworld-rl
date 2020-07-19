@@ -50,9 +50,17 @@ def __layout__(): #default plot layout
             'xaxis':{'ticks':'outside', 'showgrid':False, 'showline':True, 'mirror':True, 'linewidth':2, 'linecolor':'black'},
             'yaxis':{'ticks':'outside', 'showgrid':False, 'showline':True, 'mirror':True, 'linewidth':2, 'linecolor':'black'}}
 
+
 def __layout_noaxis__(): #plot layout without axes
-    return {'xaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False},
+    return {'plot_bgcolor':'white',
+            'xaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False},
             'yaxis':{'ticks':'', 'showgrid':False, 'showline':False, 'showticklabels':False}}
+
+def layout_default():
+    return __layout__()
+
+def layout_noaxis():
+    return __layout_noaxis__()
 
 def __line_mode__(mode):
     assert mode in line_mode.__dict__.values()
@@ -75,10 +83,9 @@ def __legend__(legend, size): #default legend
     else:
         return range(1, size + 1)
 
-
 class SimplePlot:
     
-    def __init__(self, x, y, legend=None, mode=line_mode.marker):
+    def __init__(self, x, y, legend=None, mode=line_mode.marker, **kwargs):
         if y is None:
             raise SimplePlotException("argument y cannot be None.")
         
@@ -91,7 +98,7 @@ class SimplePlot:
         fig = go.Figure(layout=layout)
 
         for i, xi, yi in zip(range(len(x)), x, y):
-            fig.add_trace(go.Scatter(x=xi, y=yi, mode=mode[i], name=legend[i]))
+            fig.add_trace(go.Scattergl(x=xi, y=yi, mode=mode[i], name=legend[i]))
 
         fig.update_layout(plot_bgcolor='white', margin=dict(t=10,l=10,r=10,b=10))
         self.fig = fig
@@ -101,6 +108,9 @@ class SimplePlot:
 
     def display(self):
         self.fig.show()
+
+    def add_shape(self, *args, **kwargs):
+        self.fig.add_shape(*args, **kwargs)
 
     def add_hline(self, y):
         shapes = list(self.fig.layout.shapes)
@@ -161,6 +171,8 @@ class SimplePlot:
                 x = [x]
                 y = [y]
         return x,y
+
+
 
     
 def show_widget(widget, title="widget"): #???

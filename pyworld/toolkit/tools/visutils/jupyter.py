@@ -1,5 +1,7 @@
 import plotly.offline as pyo
 import plotly.graph_objs as go
+import plotly.figure_factory as ff
+
 # Set notebook mode to work in offline
 #pyo.init_notebook_mode()
 
@@ -27,6 +29,7 @@ except:
     pass
 
 
+
 class SimplePlot(vis_plot.SimplePlot):
     '''
         Wrapper around a plotly figure that allows offline updates in Jupyter.
@@ -38,6 +41,7 @@ class SimplePlot(vis_plot.SimplePlot):
     
     def display(self):
         display(self.fig)
+        return self
 
     def on_hover(self, fun, trace=0):
         self.fig.layout.hovermode = 'closest'
@@ -71,10 +75,10 @@ class DynamicPlot(SimplePlot):
             trace (int, optional): to update. Defaults to 0.
 
         """
-        if x is None:
+        if y is None:
+            y = x
             x = list(np.arange(self.__count, self.__count + len(y)))
 
-        assert y is not None
         assert len(x) == len(y)
         assert trace == 0 # multiple traces not supported yet
 
@@ -94,11 +98,13 @@ class DynamicPlot(SimplePlot):
             y ((int, float)): y data.
             trace (int, optional): to update. Defaults to 0.
         """
-        assert y is not None
+        assert x is not None
         assert trace == 0 # multiple traces not supported yet
 
-        if x is None:
+        if y is None:
+            y = x
             x = self.__count
+
         self.__cachex.append(x)
         self.__cachey.append(y)
         self.__count += 1
@@ -114,8 +120,63 @@ class DynamicPlot(SimplePlot):
         self.__count = len(x)
         super(DynamicPlot, self).update(x=x,y=y,trace=trace)
 
+# =========== QUIVER ========== #
+# TODO move to new another file?
 
-        
+from plotly.figure_factory._quiver import _Quiver
+
+class Quiver:
+
+    def __init__(self, x, y, u, v, scale=0.1, arrow_scale=0.3, angle=math.pi / 9, scaleratio=None, **kwargs):
+        super(Quiver, self).__init__()
+
+        if scaleratio is None:
+            self.quiver_obj = _Quiver(x, y, u, v, scale, arrow_scale, angle)
+        else:
+            self.quiver_obj = _Quiver(x, y, u, v, scale, arrow_scale, angle, scaleratio)
+        barb_x, barb_y = self.quiver_obj.get_barbs()
+        arrow_x, arrow_y = self.quiver_obj.get_quiver_arrows()
+
+        plt = go.Scatter(x=barb_x + arrow_x, y=barb_y + arrow_y, mode="lines", **kwargs)
+        self.fig = go.FigureWidget(go.Figure(data=[plt], layout=vis_plot.layout_default()))
+
+    def display(self):
+        display(self.fig)
+
+    def update(self, x, y, u, v):
+        self.quiver_obj.x = x
+        self.quiver_obj.y = y
+        self.quiver_obj.u = u
+        self.quiver_obj.v = v
+        barb_x, barb_y = self.quiver_obj.get_barbs()
+        arrow_x, arrow_y = self.quiver_obj.get_quiver_arrows()
+        self.fig.data[0].x = barb_x + arrow_x
+        self.fig.data[0].y = barb_y + arrow_y
+
+    def __str__(self):
+        return str(self.fig)
+
+    def __repr__(self):
+        return str(self.fig)
+
+class QuiverUnit(Quiver):
+
+    def __init__(self, u, v, **kwargs):
+        x = y = np.zeros_like(u)
+        super(QuiverUnit, self).__init__(x,y,u,v,**kwargs)
+
+    def update(self, u,v):
+        x = y = np.zeros_like(u)
+        return super(QuiverUnit, self).update(x,y,u,v)
+
+def quiver(x=[], y=[], u=[], v=[], arrow_scale=.1, scaleratio=1, **kwargs):
+    return Quiver(x,y,u,v,arrow_scale=arrow_scale, scaleratio=scaleratio, **kwargs)
+
+def quiver_unit(u=[], v=[], scale=1., arrow_scale=.1, scaleratio=1, **kwargs):
+    return QuiverUnit(u,v,arrow_scale=arrow_scale, scaleratio=scaleratio, **kwargs)
+
+# ========================================= #
+
 def histogram(x, bins=20, legend=None, log_scale=False, show=True):
     fig = vis_plot.histogram(x, bins=bins, legend=legend, log_scale=log_scale, show=False)
     fig = go.FigureWidget(fig)
@@ -123,7 +184,7 @@ def histogram(x, bins=20, legend=None, log_scale=False, show=True):
         display(fig)
     return fig
 
-def plot(x,y,mode=line_mode.line,legend=None,show=True):
+def plot(x=[],y=[],mode=line_mode.line,legend=None,show=True):
     plot = SimplePlot(x,y,mode=mode,legend=legend)
     if show:
         plot.display()
@@ -165,7 +226,8 @@ def progress(iterator, length=None, info=None):
     
 def scatter_image(x, y, images, scale=1, mode=line_mode.both, scatter_colour=None, line_colour=None, width=None, height=None):
     #images must be in NHWC format
-    assert transform.isHWC(images)
+    if transform.isCHW(images):
+        images = transform.HWC(images)
 
     if transform.is_float(images):
         images = transform.to_integer(images)
@@ -268,9 +330,6 @@ def image(image, scale=1, interpolation=transform.interpolation.nearest, show=Tr
     if show:
         image_widget.display()
     return image_widget
-
-
-
 
 def images(images, scale=1, on_interact=lambda x: None, step=1, value=0, window=1, interpolation=transform.interpolation.nearest, show=True):
     image_widget = SimpleImage(images[0], scale=scale, interpolation=interpolation)

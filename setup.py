@@ -16,4 +16,7 @@ setup(name='pyworld',
       author_email='brjw@hotmail.co.uk',
       license='MIT',
       packages=['pyworld'],
+      install_requires=["opencv-python", "matplotlib", "numpy",
+                        "plotly", "ipywidgets", "ipycanvas", "jupyterlab"
+                        "h5py"],
       zip_safe=False)

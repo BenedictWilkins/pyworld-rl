@@ -39,6 +39,48 @@ def exit_on(iterator, on):
 
 from .batch import batch_iterator
 
+'''
+
+def correlation(x, y):
+
+    if len(x.shape) == 1:
+        x = x[...,np.newaxis]
+    if len(y.shape) == 1:
+        y = y[...,np.newaxis]
+    
+    xx, yy = x - x.mean(0), y - y.mean(0)
+    xy = xx.T[...,np.newaxis] * yy[np.newaxis,...]
+    xys = xy.sum(len(xx.shape)-1)
+    xs,ys = (xx*xx).sum(0), (yy*yy).sum(0)
+    xxyys = np.sqrt(xs[...,np.newaxis] * ys[np.newaxis,...])
+    return xys / xxyys
+'''
+
+def correlation(x, y):
+    """ Compute correlation of x and y. Assumes [n,...] for x and y where n is the number of samples.
+    
+    Args:
+        x (numpy.ndarray): Collection of samples
+        y (numpy.ndarray): Collection of samples
+
+    Returns:
+        numpy.ndarray :
+    """
+    if len(x.shape) == 1:
+        x = x[...,np.newaxis]
+    if len(y.shape) == 1:
+        y = y[...,np.newaxis]
+    
+    xx, yy = x - x.mean(0), y - y.mean(0)
+    xx, yy = xx.reshape(xx.shape[0],-1), yy.reshape(yy.shape[0],-1)
+    xy = xx.T[...,np.newaxis] * yy[np.newaxis,...]
+    xys = xy.sum(1)
+    xys = xys.reshape(*x.shape[1:], *y.shape[1:])
+    xs,ys = (xx*xx).sum(0), (yy*yy).sum(0)
+    xxyys = np.sqrt(xs.T[...,np.newaxis] * ys[np.newaxis,...])
+    xxyys = xxyys.reshape(*x.shape[1:], *y.shape[1:])
+    return np.nan_to_num(xys / xxyys)
+
 
 
 def window(x, shape):

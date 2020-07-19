@@ -11,33 +11,26 @@ import torch.nn.functional as F
 import numpy as np
 from collections import namedtuple
 
-from pyworld.toolkit.tools.datautils.accumulate import EMA, CMA
-from .Optimise import Optimiser, TorchOptimiser
-
-#### !!! DEPRECATED !!! use pyworld.toolkit.nn.autoencoder package instead
+from ..optimise import TorchOptimiser
 
 class AEOptimiser(TorchOptimiser):
     
     def __init__(self, ae, loss=F.binary_cross_entropy_with_logits, lr=0.0005):
         super(AEOptimiser, self).__init__(ae, base_optimiser=torch.optim.Adam(ae.parameters(), lr=lr))
-        self.__loss = loss
-        self.cma = CMA(loss.__name__)
+        self.loss = loss
        
     def step(self, x, y=None):
         if y is None:
             y = x
-        loss = self.__loss(self.model(x), y.to(x.device))
-        self.cma.push(loss.item())
+        loss = self.loss(self.model(x), y.to(x.device))
         return loss
 
 class VAEOptimiser(TorchOptimiser):
 
     def __init__(self, vae, loss, beta=1., lr=0.0005):
         super(VAEOptimiser, self).__init__(vae, base_optimiser=torch.optim.Adam(vae.parameters(), lr=lr))
-
         self.beta = beta
-        self.__loss = loss
-        self.cma = CMA('total_loss', loss.__name__, 'kld_loss')
+        self.__loss = losss
 
     def step(self, x):
         x, mu_z, logvar_z = self.model(x)
@@ -45,7 +38,6 @@ class VAEOptimiser(TorchOptimiser):
         kld_loss = self.beta * -0.5 * (1. + logvar_z - mu_z.pow(2) - logvar_z.exp()).sum()#.view(batch_size, -1).mean()
         x_loss = self.__loss(x, x_target)
         loss = x_loss + kld_loss
-        self.cma.push(loss.item(), kld_loss.item(), x_loss.item())
         return loss
 
 class DAEOptimiser(TorchOptimiser):
@@ -64,11 +56,9 @@ class DAEOptimiser(TorchOptimiser):
     def __init__(self, ae, loss, noise_source = noise_gaussian, lr=0.0005):
         super(DAEOptimiser, self).__init__(ae, base_optimiser=torch.optim.Adam(ae.parameters(), lr=lr))
         self.__loss = loss
-        self.cma = CMA(loss.__name__)
        
     def step(self, x):
         loss = self.__loss(self.model(x), x.to(self.model.device))
-        self.cma.push(loss.item())
         return loss
 
 

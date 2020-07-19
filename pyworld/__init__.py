@@ -12,8 +12,8 @@ Created on Tue Mar 19 13:12:44 2019
 #from . import model
 #from .algorithms.policygradient import PolicyGradient
 
-from . import algorithms
 from . import toolkit
+from . import algorithms
 from . import environment
 
-__all__ = ('environment', 'toolkit', 'algorithms')
+__all__ = ('toolkit', 'algorithms', 'environment')

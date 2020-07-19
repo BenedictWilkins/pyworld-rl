@@ -31,6 +31,14 @@ def stack(states, frames=3, step=1):
     return result
 
 
+
+def maxpool(state, factor=2):
+    input_size = 128
+    output_size = 64
+    bin_size = input_size // output_size
+    small_image = large_image.reshape((output_size, bin_size, 
+                                   output_size, bin_size, 3)).max(3).max(1)
+
 def atari_transform(states):
     states = T.to_float(states)
     states = T.gray_all(states)

@@ -24,6 +24,12 @@ from .formats import video
 from .formats import sound
 from .formats import misc
 
+for cls in __import__.fileio.__subclasses__():
+    try:
+        cls() # all valid instances should have no __init__ arguments
+    except TypeError:
+        pass #ignore them
+
 def load(path, **kwargs):
     """ Load a file.
 
@@ -36,7 +42,7 @@ def load(path, **kwargs):
     path = expand_user(path)
     if has_extension(path):
        _, ext = os.path.splitext(path)
-       return __import__.fileio.io[ext](path, **kwargs)
+       return __import__.fileio.io[ext].load(path, **kwargs)
 
 def save(path, data, force=True, overwrite=False, **kwargs):
     """ Save a file.
@@ -53,7 +59,7 @@ def save(path, data, force=True, overwrite=False, **kwargs):
     path = file(path, force=force, overwrite=overwrite)
     if has_extension(path):
        _, ext = os.path.splitext(path)
-       return __import__.fileio.io[ext](path, data, **kwargs)
+       return __import__.fileio.io[ext].save(path, data, **kwargs)
     
 def expand_user(path):
     """ Expands \"~\" in a file path (see os.path.expanduser).
@@ -132,7 +138,7 @@ def files(path, full=False):
     else:
         return [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
 
-def sort_files(file s):
+def sort_files(files):
     """ 
         Sorts file names by their unique tag (X):
 

@@ -136,6 +136,9 @@ class VarianceAccumulator2:
     
     
 class CMA:
+    """
+        Cumulative moving average.
+    """
     
     def __init__(self, *labels):
         self.labels = labels

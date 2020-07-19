@@ -7,10 +7,14 @@ author: Benedict Wilkins
 """
 import gym
 import numpy as np
+import copy
+
+from collections import deque
 
 from . import transform
 
 from ..fileutils import save as fu_save
+from ..visutils import transform as T
 
 class EpisodeRecordWrapper(gym.Wrapper):
 
@@ -113,10 +117,174 @@ class RewardWrapper(gym.Wrapper):
     
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
+
+
+class Float(gym.Wrapper):
+
+    def __init__(self, env):
+        super(Float, self).__init__(env)
+        self.observation_space = gym.spaces.Box(np.float32(0), np.float32(1), shape=env.observation_space.shape, dtype=np.float32)
+
+    def step(self, action, *args, **kwargs):
+        observation, *rest = self.env.step(action)
+        return (observation.astype(np.float32) / 255., *rest)
+
+    def reset(self, *args, **kwargs):
+        observation = self.env.reset()
+        return observation.astype(np.float32) / 255.
+
+class Integer(gym.Wrapper):
+
+    def __init__(self, env):
+        super(Integer, self).__init__(env)
+        self.observation_space = gym.spaces.Box(np.uint8(0), np.uint8(255), shape=env.observation_space.shape, dtype=np.uint8)
+
+    def step(self, action, *args, **kwargs):
+        observation, *rest = self.env.step(action)
+        return ((observation * 255).astype(np.uint8), *rest)
+
+    def reset(self, *args, **kwargs):
+        observation = self.env.reset()
+        return (observation * 255).astype(np.uint8)
+
+class CHW(gym.Wrapper):
+
+    def __init__(self, env):
+        super(CHW, self).__init__(env)
+        self.observation_space = copy.deepcopy(env.observation_space)
+        h,w,c = self.observation_space.shape
+        assert c == 1 or c == 3 or c == 4 # invalid channels
+        self.observation_space.shape = (c,h,w)
+        self.observation_space.low = self.observation_space.low.reshape(self.observation_space.shape)
+        self.observation_space.high = self.observation_space.high.reshape(self.observation_space.shape)
+
+    def step(self, action, *args, **kwargs):
+        observation, *rest = self.env.step(action)
+        return (observation.transpose((2,0,1)), *rest)
+
+    def reset(self, *args, **kwargs):
+        observation = self.env.reset()
+        return observation.transpose((2,0,1))
         
+class HWC(gym.Wrapper):
+
+    def __init__(self, env):
+        super(HWC, self).__init__(env)
+        self.observation_space = copy.deepcopy(env.observation_space)
+        c,h,w = self.observation_space.shape
+        assert c == 1 or c == 3 or c == 4 # invalid channels
+        self.observation_space.shape = (h,w,c)
+        self.observation_space.low = self.observation_space.low.reshape(self.observation_space.shape)
+        self.observation_space.high = self.observation_space.high.reshape(self.observation_space.shape)
+
+    def step(self, action, *args, **kwargs):
+        observation, *rest = self.env.step(action)
+        return (observation.transpose((1,2,0)), *rest)
+
+    def reset(self, *args, **kwargs):
+        observation = self.env.reset()
+        return observation.transpose((1,2,0))
+
+class Crop(gym.Wrapper):
+    pass        
+
+class Atari(gym.Wrapper):
+
+    def __init__(self, env):
+        super(Atari, self).__init__(env)
+        h,w,c = self.observation_space.shape
+        assert c == 3 # invalid channels
+        h -= (h//2)
+        w -= (w//2)
+        self.observation_space = gym.spaces.Box(np.float32(0), np.float32(1), shape=(1,h,w), dtype=np.float32)
+       
+
+    def fast_transform(self, observation):
+        observation = observation.transpose((2,0,1)) #to CHW
+        observation = observation[:,::2,::2] #fast downsample
+        components=(0.299, 0.587, 0.114) #to grayscale
+        observation = (observation[0, ...] * components[0] + 
+                       observation[1, ...] * components[1] + 
+                       observation[2, ...] * components[2])[np.newaxis, ...]
+        observation = observation.astype(np.float32) / 255. #to float
+        return observation
+
+    def step(self, action, *args, **kwargs):
+        observation, *rest = self.env.step(action)
+        observation = self.fast_transform(observation)
+        return (observation, *rest)
+
+    def reset(self, *args, **kwargs):
+        observation = self.env.reset()
+        observation = self.fast_transform(observation)
+        return observation
+
+class Stack(gym.Wrapper):
+
+    def __init__(self, env, n=3):
+        super(Stack, self).__init__(env)
+        shape = list(self.observation_space.shape)
+        channel = np.isin(shape, [1,3,4])
+        print(channel, np.sum(channel))
+        if np.sum(channel) != 1:
+            raise ValueError("Invalid channels in observation space: {0}".format(self.observation_space))
+        self.__channel = np.argwhere(channel).item()
+        shape[self.__channel] = n * shape[self.__channel]
+        self.__buffer = deque(maxlen=n)
+        self.observation_space = gym.spaces.Box(self.observation_space.low.flat[0], self.observation_space.high.flat[0], shape=shape, dtype=self.observation_space.dtype)
+
+    def step(self, *args, **kwargs):
+        state, *rest = super(Stack, self).step(*args, **kwargs)
+        self.__buffer.append(state)
+        return (np.concatenate(self.__buffer, axis=self.__channel), *rest)
+
+    def reset(self, *args, **kwargs):
+        state = super(Stack, self).reset(*args, **kwargs)
+        for i in range(self.__buffer.maxlen):
+            self.__buffer.append(state)
+        return np.concatenate(self.__buffer, axis=self.__channel)
+
+class ResetSkip(gym.Wrapper):
+
+    def __init__(self, env, n=1):
+        super(ResetSkip, self).__init__(env)
+        self.n = n
+    
+    def step(self, *args, **kwargs):
+        return super(ResetSkip, self).step(*args,**kwargs)
+    
+    def reset(self, *args, **kwargs):
+        super(ResetSkip, self).reset(*args, **kwargs)
+        for i in range(self.n):
+            state, *rest = self.step(0)
+        return state
+
+import inspect
+import sys
+import re
+
+
+__all__ = dict(inspect.getmembers(sys.modules[__name__], inspect.isclass))
+
+
+def wrap(env, *wrappers):
+    def _wrap(env, wrapper, **kwargs):
+        if isinstance(wrapper, str):
+            env = __all__[wrapper](env, **kwargs)
+        elif isinstance(wrapper, gym.Wrapper):
+            env = wrapper(env, **kwargs)
+        else:
+            raise ValueError("Invaliad wrapper: {0}".format(wrapper))
+        return env
+
+    for wrapper in wrappers:
+        if isinstance(wrapper, (tuple, list)):
+            env = _wrap(env, wrapper[0], **wrapper[1])
+        else:
+            env = _wrap(env, wrapper)
         
-        
-        
-        
+    return env
+
+
         
         

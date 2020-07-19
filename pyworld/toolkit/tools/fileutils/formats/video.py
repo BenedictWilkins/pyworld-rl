@@ -12,7 +12,7 @@ __status__ = "Development"
 import cv2
 from pyworld.toolkit.tools.fileutils.__import__ import fileio
 
-class gifIO(fileio):
+class gifIO(fileio): #TODO use opencv or pill (avoid movie py dependancy)
 
     def __init__(self):
         super(gifIO, self).__init__('.gif', 'moviepy.editor')

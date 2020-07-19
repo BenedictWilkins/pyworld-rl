@@ -1,6 +1,20 @@
 
 import numpy as np
 
+class noise:
+
+    def gaussian(x, p = 0.3):
+        return x + np.random.randn(*x.shape).astype(x.dtype)
+
+    def pepper(x, p = 0.3):
+        return (x * (np.random.uniform(size=x.shape) > p)).astype(x.dtype)
+
+    def saltpepper(x, p = 0.3):
+        i = np.random.uniform(size=x.shape) < p
+        x[i] = (np.random.uniform(size=np.sum(i)) > 0.5)
+        return x
+
+
 def unitvector(d, n=1):
     """ Random unit vector(s).
 

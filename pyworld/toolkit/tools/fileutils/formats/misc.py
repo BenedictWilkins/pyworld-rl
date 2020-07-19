@@ -40,7 +40,7 @@ class TorchIO(fileio):
     def load(self, file, model=None):
         if model is None:
             raise TorchIO.TorchIOException("Loading a PyTorch model requires a template object, i.e. load(file, model=template)")
-        model.load_state_dict(torch.load(file))
+        model.load_state_dict(self.torch.load(file))
         return model #for some reason returning the model here can cause issues (it is not loaded fully before the return?) TODO ??
    
 class HDF5IO(fileio):

@@ -40,6 +40,13 @@ except:
 
 __all__ = ('transform', 'animation', 'detection', 'plot')
 
+def hstitch(images):
+    pass
+
+def vstitch(images):
+    pass
+
+
 def grid(domain, n=100):
     """ Create a 2D grid of n^2 points over the domain. 
 
@@ -371,11 +378,10 @@ def gallery(images, cols=3):
               .reshape(height*nrows, width*cols, intensity))
     return result
 
-def hgallery(x, n=None):
+def hgallery(x, n=10):
     assert transform.isHWC(x)
-
     if n is None:
-        n = images.shape[0]
+        n = x.shape[0]
     m,h,w,c = x.shape
     n = min(m, n) #if n is larger, just use m
     if m % n != 0:

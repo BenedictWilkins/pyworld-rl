@@ -9,6 +9,50 @@ __author__ = "Benedict Wilkins"
 __email__ = "benrjw@gmail.com"
 __status__ = "Development"
 
+import os
+import sys
+import pprint
+
+from IPython.core.display import HTML
+
+class HTMLOut(object):
+
+    def __init__(self, html_template="{0}"):
+        self.__template = html_template
+        self.__text = HTML()
+
+    def write(self, *args, **kwargs):
+        text = pprint.pformat(*args, **kwargs)
+        self.__text.value = text
+        display(HTML(self.__template(text)))
+
+def local_import(root=1):
+    """ Adds local directory to the system path.
+        Example: 
+        
+        Project directory Structure: 
+            project
+                lib
+                    __init__.py
+                notebook_folder
+                    notebook.ipynb
+
+        in notebook.ipynb:
+
+            local_import(1)
+            import project.lib
+            ...
+
+    Args:
+        root (int, optional): location of the root directory. Defaults to 0 (the current directory)
+    """
+    module_path = os.path.abspath('.')
+    module_path = "/".join(module_path.split("/")[:-root])
+    if module_path not in sys.path:
+        sys.path.append(module_path)
+    return module_path
+    
+
 def cell_variables():
     """ Get all of the (global) variables in the current (or previous) Jupyter Notebook cell.
 
@@ -34,10 +78,11 @@ def cell_variables():
     if not "_" in g:
         raise ValueError("The function \"cell_variables\" must be called from within a Jupyter Notebook.")
     
+    IGNORE = "#ignore"
     #process each line...
     x = cell_inputs.replace(" ", "").split("\n")
     x.pop(c_line - 1) #lines are 1 indexed, remove the calling line 
-    x = [a.split("=")[0] for a in x if "=" in a] #all of the variables in the cell
+    x = [a.split("=")[0] for a in x if "=" in a and IGNORE not in a] #all of the variables in the cell
     result = {k:g[k] for k in x if k in g}
 
     return result

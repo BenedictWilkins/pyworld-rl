@@ -7,8 +7,7 @@ author: Benedict Wilkins
 """
 
 from . import Optimise
-from . import TripletOptimiser
 from . import ContrastiveOptimiser
 from . import AEOptimiser
 
-__all__ = ('Optimise', 'TripletOptimiser', 'ContrastiveOptimiser', 'AEOptimiser')
+__all__ = ('Optimise', 'ContrastiveOptimiser', 'AEOptimiser')

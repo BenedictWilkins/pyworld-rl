@@ -43,7 +43,7 @@ class DiscretePolicy(Policy):
 
     def __init__(self, action_space, dtype=np.int64):
         if isinstance(action_space, int):
-            self.action_space = gym.spaces.Discrete(action_space)
+            action_space = gym.spaces.Discrete(action_space)
         action_space.dtype = dtype
         super(DiscretePolicy, self).__init__(action_space)
 
@@ -52,10 +52,6 @@ class ContinuousPolicy(Policy):
     def __init__(self, action_space, dtype=np.float32):
         action_space.dtype = dtype
         super(ContinuousPolicy, self).__init__(action_space)
-
-def unonehot(policy, dtype=np.int64):
-    policy.action_space
-
 
         
 def onehot(policy, dtype=np.float32):
@@ -74,16 +70,40 @@ def onehot(policy, dtype=np.float32):
     return policy
     
 def uniform(action_space, dtype=np.int64):
+    """ Uniform random policy that selects an action uniformly from the given (discrete) action space.
+
+    Args:
+        action_space (gym.spaces.Discrete, int): action space
+        dtype (type, optional): dtype of a sampled action. Defaults to np.int64.
+
+    Returns:
+        DiscretePolicy: the policy
+    """
     policy = DiscretePolicy(action_space, dtype=dtype)
     action_space = policy.action_space
-    policy.sample = lambda x=None : action_space.dtype(np.random.randint(0, action_space.n))
+    policy.sample = lambda *args, **kwargs: action_space.dtype(np.random.randint(0, action_space.n))
     return policy
 
+def random(action_space, p=None, dtype=np.int64): #TODO assume discrete action_space?
+    """ Random policy that selects an action from the given (discrete) action space according to the given probabilities p.
 
+    Args:
+        action_space (gym.spaces.Discrete, int): action space
+        p (sequence, optional): action probabilities associated with each action. Defaults to uniform probability.
+        dtype (type, optional): dtype of a sampled action. Defaults to np.int64.
 
-
-
-
+    Returns:
+        DiscretePolicy: the policy
+    """
+    if p is None:
+        return uniform(action_space, dtype=dtype)
+    
+    policy = DiscretePolicy(action_space, dtype=dtype)
+    assert len(p) == policy.action_space.n
+    sample_space = np.arange(0, policy.action_space.n)
+    policy.sample = lambda *args, **kwargs: action_space.dtype(np.random.choice(sample_space, p=p))
+    return policy
+    
 
 # TODO update others to follow DiscretePolicy!
 

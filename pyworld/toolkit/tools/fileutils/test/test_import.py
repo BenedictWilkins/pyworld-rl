@@ -90,8 +90,9 @@ class TestVideo(unittest.TestCase):
         #self.assertTrue(np.array_equal(d, io.load(path)))
 
 if __name__ == "__main__":
-    unittest.main()
-   
+    #unittest.main()
+    text.JsonIO()
+    text.JsonIO()
 
 
 

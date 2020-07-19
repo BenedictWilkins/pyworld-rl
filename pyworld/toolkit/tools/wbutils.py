@@ -71,6 +71,8 @@ def load(run, path="./wandb/", replace=False, blacklist=[], whitelist=[], detail
     path = os.path.join(path, run)
     path = os.path.abspath(path)
 
+    print(path)
+    print(os.path.isdir(path))
     if os.path.isdir(path):
         print(" -- found local run at {0}".format(path))
         meta_data = fu.load(os.path.join(path, WANDB_META))
@@ -107,7 +109,7 @@ def load(run, path="./wandb/", replace=False, blacklist=[], whitelist=[], detail
 
 class WB:
    
-    def __init__(self, project, model, save=True, id=None,  config={}, **options):
+    def __init__(self, project, model, save=True, id=None, config={}, **options):
         self.project = project
         self.model = model
         self.__save = save
@@ -123,9 +125,12 @@ class WB:
 
         config['model_class'] = self.model.__class__.__name__
 
-        wandb.init(project=project, id=id, config=config, **options)
+        self.run = wandb.init(project=project, id=id, config=config, **options)
 
     def __enter__(self):
+        print("wandb project: {0}".format(self.project))
+        print("-- run: {0}".format(self.run))
+        print("-- directory: {0}".format(os.path.split(self.run.dir)[1]))
         wandb.watch(self.model, log='all')
         
     def __call__(self, **info):

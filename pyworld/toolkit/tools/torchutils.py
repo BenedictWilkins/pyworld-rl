@@ -61,19 +61,36 @@ def distance_matrix(x, y):
         dist_mat[i] = sq_dist.view(1, -1)
     return dist_mat    
 
-def to_numpy(x):
+def to_numpy(x, *y):
     '''
         Converts x to a numpy array, detaching gradient information and moving to cpu if neccessary.
+        
+        Examples:
+            a,b = to_numpy(Tensor(), Tensor())
+            a,b = to_numpy((Tensor(), Tensor()))
+            (a,b), c = to_numpy((Tensor(), Tensor()), Tensor())
     '''
-    if isinstance(x, torch.Tensor):
-        x = x.cpu()
-        if x.requires_grad:
-            x = x.detach()
-        return x.numpy()
-    elif isinstance(x, np.ndarray):
-        return x
+    def _to_numpy(x):
+        if isinstance(x, tuple):
+            return tuple([_to_numpy(y) for y in x])
+
+        if isinstance(x, torch.Tensor):
+            if x.requires_grad:
+                x = x.detach()
+            x = x.cpu()
+            return x.numpy()
+        elif isinstance(x, np.ndarray):
+            return x
+        else:
+            return np.array(x)
+
+    if isinstance(x, tuple):
+        return _to_numpy(tuple([*x, *y]))
+    elif len(y) > 0:
+        return _to_numpy(tuple([x, *y]))
     else:
-        raise TypeError("x must be torch Tensor or numpy array")
+        return _to_numpy(x)
+    
 
 def to_numpyf(model):
     '''

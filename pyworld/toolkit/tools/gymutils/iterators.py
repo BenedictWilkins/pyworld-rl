@@ -86,7 +86,7 @@ class Step(metaclass=StepMeta):
     
     def step(self, action):
         state, reward, done, *info = self.env.step(action)
-        return state, action, reward, done, *info
+        return (state, action, reward, done, *info)
 
     def reset(self, *_):
         return (self.env.reset(),)

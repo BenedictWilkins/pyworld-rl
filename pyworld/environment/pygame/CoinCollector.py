@@ -10,7 +10,7 @@ from . import Environment
 
 import numpy as np
 
-class CoinCollector(Environment.GameEnvironment):
+class CoinCollector(Environment.PyGameEnvironment):
    
    physics = { 'up':           lambda env: env.set_position(env.position + env.speed * np.array([0,-1])),
                'up_right' :    lambda env: env.set_position(env.position + env.speed * np.array([1,-1])),

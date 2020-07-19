@@ -57,6 +57,9 @@ class ObjectMover(gym.Env):
         self.action_space = gym.spaces.Discrete(4 + int(none_action))
         self.observation_space = gym.spaces.Box(low=np.float32(0.), high=np.float32(1.), shape=shape, dtype=np.float32)
         
+    def get_action_meanings(self):
+        return [self.action_labels[i] for i in range(len(self.action_labels))]
+    
     def sample_step(self, position, policy):
         self.obj.pos = position
         self.__place()
@@ -66,6 +69,7 @@ class ObjectMover(gym.Env):
         nstate, action, _, _ = self.step(action)
         return state, 0., nstate
 
+    @staticmethod
     def cover(self, x=100, y=100):
         """ 
             Returns all posssible states of the game.
@@ -83,12 +87,9 @@ class ObjectMover(gym.Env):
             self.__place()
             z[i] = self.state
 
-        return z
-
-
+        return z, None #TODO action cover?
         
     def step(self, action):
-#        print(action)
         self.obj.vel = self.v_map[action]
         self.obj.pos += self.obj.vel
         self.__place()
@@ -160,6 +161,17 @@ def a(shape=(1,64,64), mode=mode_image, none_action=False):
 def default(mode=mode_image, none_action=False):
     return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode, none_action=none_action)
 
+def stochastic1():
+    class vmap:
+        def __getitem__(self, k):
+            basevel = 2
+            r = (np.random.randint(0,2))*2 - 1 #1/-1
+            return (np.array([0,r*basevel]), np.array([r*basevel, 0]))[k]
+            
+    env = default()
+    env.action_labels = {0:'NORTH-SOUTH', 1:'EAST-WEST'}
+    env.action_space = gym.spaces.Discrete(2)
+    env.v_map = vmap()
 
-
+    return env
         
