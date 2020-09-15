@@ -68,4 +68,7 @@ class MSEOptimiser(TorchOptimiser):
         super(MSEOptimiser, self).__init__(model, base_optimiser=base_optimiser)
 
     def step(self, x, y):
-        return F.mse_loss(self.model(x), y)
+        if isinstance(x, tuple):
+            return F.mse_loss(self.model(*x), y)
+        else:
+            return F.mse_loss(self.model(x), y)

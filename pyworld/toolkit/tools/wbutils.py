@@ -71,19 +71,25 @@ def load(run, path="./wandb/", replace=False, blacklist=[], whitelist=[], detail
     path = os.path.join(path, run)
     path = os.path.abspath(path)
 
-    print(path)
-    print(os.path.isdir(path))
+    
     if os.path.isdir(path):
         print(" -- found local run at {0}".format(path))
-        meta_data = fu.load(os.path.join(path, WANDB_META))
-        if meta_data[WANDB_MODE] == WANDB_RUN and replace:
-            download_files(run, path=path, replace=replace)
+        try:
+            meta_data = fu.load(os.path.join(path, WANDB_META))
+            if meta_data[WANDB_MODE] == WANDB_RUN and replace:
+                download_files(run, path=path, replace=replace)
+        except:
+            print(" -- failed to find wandb meta data...")
+            if replace:
+                download_files(run, path=path, replace=replace)
     else:
+        print(" -- failed to find file locally...")
         download_files(run, path=path, replace=replace)
+
     from pprint import pprint
     #load files
     config = fu.load(os.path.join(path, WANDB_CONFIG))
-    print(" -- found config file: ")
+    print(" -- found config file.")
     #pprint(config)
     def value_or(v):
         try:

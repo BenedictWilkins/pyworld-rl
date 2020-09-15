@@ -16,6 +16,8 @@ from . import transform
 from ..fileutils import save as fu_save
 from ..visutils import transform as T
 
+import skimage
+
 class EpisodeRecordWrapper(gym.Wrapper):
 
     def __init__(self, env, path, compress=True):
@@ -185,6 +187,58 @@ class HWC(gym.Wrapper):
         observation = self.env.reset()
         return observation.transpose((1,2,0))
 
+class Scale(gym.Wrapper):
+    """ 
+        Scales observations (W,H) by a specified amount.
+    """
+
+    def __init__(self, env, scale, interpolation=T.interpolation.nearest):
+        super(Scale, self).__init__(env)
+        if isinstance(scale, (tuple, list)):
+            assert len(scale) == 2
+        elif isinstance(scale, (int, float)):
+            scale = (scale, scale)
+        self.scale = scale
+        self.interpolation = interpolation
+
+        self.__to_dtype = None
+
+        if issubclass(env.observation_space.dtype.type, np.integer):
+            self.__to_dtype = lambda x: (x * 255.).astype(np.uint8) 
+        elif issubclass(env.observation_space.dtype.type, np.floating):
+            self.__to_dtype = lambda x: x.astype(np.float32)
+        else:
+            raise TypeError("Invalid observation dtype: {0}".format(env.observation_space.dtype))
+
+        f = T.image_format(env.observation_space.shape)
+        
+        ci, hi, wi = f.index("C"), f.index("H"), f.index("W")
+        shape = list(env.observation_space.shape)
+        
+        shape[hi] = int(shape[hi] * scale[1])
+        shape[wi] = int(shape[wi] * scale[0])
+
+        print(shape)
+        print(env.observation_space.dtype)
+        print(env.observation_space.low.flat[0], env.observation_space.high.flat[0])
+        self.observation_space = gym.spaces.Box(env.observation_space.low.flat[0], env.observation_space.high.flat[0], 
+                                                shape=shape, dtype=env.observation_space.dtype)
+        
+    def step(self, action, *args, **kwargs):
+        observation, *rest = self.env.step(action, *args, **kwargs)
+        observation = skimage.transform.resize(observation, self.observation_space.shape, order=self.interpolation)
+        observation = self.__to_dtype(observation)
+        return (observation, *rest)
+
+    def reset(self, *args, **kwargs):
+        observation = self.env.reset(*args, **kwargs)
+        observation =  skimage.transform.resize(observation, self.observation_space.shape, order=self.interpolation)
+        observation = self.__to_dtype(observation)
+        return observation
+
+
+
+
 class Crop(gym.Wrapper):
     pass        
 
@@ -202,10 +256,10 @@ class Atari(gym.Wrapper):
     def fast_transform(self, observation):
         observation = observation.transpose((2,0,1)) #to CHW
         observation = observation[:,::2,::2] #fast downsample
-        components=(0.299, 0.587, 0.114) #to grayscale
-        observation = (observation[0, ...] * components[0] + 
-                       observation[1, ...] * components[1] + 
-                       observation[2, ...] * components[2])[np.newaxis, ...]
+        #components=(0.299, 0.587, 0.114) #to grayscale
+        #observation = (observation[0, ...] * components[0] + 
+        #               observation[1, ...] * components[1] + 
+        #               observation[2, ...] * components[2])[np.newaxis, ...]
         observation = observation.astype(np.float32) / 255. #to float
         return observation
 
@@ -218,6 +272,7 @@ class Atari(gym.Wrapper):
         observation = self.env.reset()
         observation = self.fast_transform(observation)
         return observation
+
 
 class Stack(gym.Wrapper):
 

@@ -11,10 +11,9 @@ __status__ = "Development"
 
 import copy
 import numpy as np
-from ..pygame import Environment 
+from ..pygame import PyGameEnvironment 
 
 DEFAULT_SIZE = (64,64)
-
 
 class Player:
 
@@ -33,10 +32,10 @@ physics = [
     {"up":np.array([0,-1]), "down":np.array([0,1]), "left":np.array([-1,0]), "right":np.array([1,0])}
 ]
 
-class Paddles(Environment.PyGameEnvironment):
+class Paddles(PyGameEnvironment):
 
-    def __init__(self, size=DEFAULT_SIZE, physics=physics[0], player2_policy=None):
-        super(Paddles, self).__init__(list(physics.keys()), display_size=size, background_colour=(0,0,0))
+    def __init__(self, size=DEFAULT_SIZE, physics=physics[0], player2_policy=None, dtype=np.float32, format="CHW"):
+        super(Paddles, self).__init__(list(physics.keys()), display_size=size, background_colour=(0,0,0), dtype=dtype, format=format)
         self.physics = physics
         self.player1 = Player(size[0]*1/8, size[1]/2, size[0]/20, size[1]/8)
         self.player2 = Player(size[0]*7/8, size[1]/2, size[0]/20, size[1]/8)
@@ -44,19 +43,14 @@ class Paddles(Environment.PyGameEnvironment):
         if player2_policy is None:
             player2_policy = lambda self, *args, **kwargs: self.action_space.sample()
         self.player2_policy = player2_policy
-
+        self.display_size = np.array(self.display_size)
 
     def step(self, action):
-        obs_space = np.flip(np.array(self.observation_space.shape))[1:] # W,H
         #update state
         self.player1.position += self.player1.speed * self.physics[self.actions[action]]
-        self.player1.position = np.clip(self.player1.position, 0, obs_space - self.player1.size)
-        #self.player1.position[1] = np.clip(self.player1.position, 0, self.observation_space.shape[0] - self.player1.size[1])
-
+        self.player1.position = np.clip(self.player1.position, 0, self.display_size - self.player1.size)
         self.player2.position += self.player2.speed * self.physics[self.actions[self.player2_policy(self, self.get_image(), action)]]
-        self.player2.position = np.clip(self.player2.position, 0, obs_space - self.player2.size)
-
-        #self.player2.position[1] = np.clip(self.player2.position[1], 0, self.observation_space.shape[0] - self.player2.size[1])
+        self.player2.position = np.clip(self.player2.position, 0, self.display_size - self.player2.size)
 
         # update graphics
         self.clear(self.background_colour) 

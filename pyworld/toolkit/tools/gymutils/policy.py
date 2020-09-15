@@ -11,8 +11,13 @@ import gym
 
 from . import spaces
 
+try:
+    import torch
+except:
+    pass # torch is not installed... ehhh. make this streamlined
 
-class value:
+
+class P:
     
     class boltzmann:
         
@@ -53,7 +58,20 @@ class ContinuousPolicy(Policy):
         action_space.dtype = dtype
         super(ContinuousPolicy, self).__init__(action_space)
 
-        
+class NeuralPolicy(DiscretePolicy):
+
+    def __init__(self, action_space, nn, p=lambda x: x, dtype=np.int64):
+        super(NeuralPolicy, self).__init__(action_Space, dtype=dtype)
+        self.nn = nn
+        self.p = p
+    
+    def sample(self, *args, **kwargs):
+        v = self.nn(*args, **kwargs)
+        p = self.p(v)
+        i = torch.multinomial(p, 1).squeeze()
+
+        raise NotImplementedError("TODO")
+
 def onehot(policy, dtype=np.float32):
     assert np.issubdtype(policy.action_space.dtype, np.integer)
     assert isinstance(policy.action_space, gym.spaces.Discrete)
@@ -68,6 +86,9 @@ def onehot(policy, dtype=np.float32):
     policy.sample = oh
     
     return policy
+
+
+
     
 def uniform(action_space, dtype=np.int64):
     """ Uniform random policy that selects an action uniformly from the given (discrete) action space.

@@ -68,12 +68,12 @@ class Sequential(nn.Module):
         return result
 
     def __str__(self):
-        slayers = "\n    ".join(["({0}): {1}".format(k,str(v)) for k,v in self.layers.items()])
+        slayers = "    " + "\n    ".join(["({0}): {1}".format(k,str(v)) for k,v in self.layers.items()])
         return "{0}(\n{1}\n)".format(self.__class__.__name__, slayers)
 
     def __repr__(self):
         return str(self)
-
+        
 class View:
 
     def __init__(self, *shape):

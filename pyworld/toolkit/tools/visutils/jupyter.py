@@ -35,7 +35,11 @@ class SimplePlot(vis_plot.SimplePlot):
         Wrapper around a plotly figure that allows offline updates in Jupyter.
     '''
 
-    def __init__(self, x, y, *args, mode=line_mode.line, legend=None, **kwargs):
+    def __init__(self, x, y=None, *args, mode=line_mode.line, legend=None, **kwargs):
+        if y is None:
+            y = x 
+            x = np.arange(y.shape[0])
+
         super(SimplePlot, self).__init__(x, y, *args, mode=mode, legend=legend, **kwargs)
         self.fig = go.FigureWidget(self.fig)
     
@@ -184,7 +188,8 @@ def histogram(x, bins=20, legend=None, log_scale=False, show=True):
         display(fig)
     return fig
 
-def plot(x=[],y=[],mode=line_mode.line,legend=None,show=True):
+def plot(x=[],y=None,mode=line_mode.line,legend=None,show=True):
+
     plot = SimplePlot(x,y,mode=mode,legend=legend)
     if show:
         plot.display()

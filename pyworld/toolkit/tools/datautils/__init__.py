@@ -39,22 +39,21 @@ def exit_on(iterator, on):
 
 from .batch import batch_iterator
 
-'''
+def window1d(x, size, step=1):
+    """ Compute a sliding window over the given 1D array. If the size/step are not compatible with tje size of, trailing elements of x will be trimmed.
+        WARNING: uses np.lib.stride_tricks, this function should only be used for preprocessing, modifying the resulting array could have undesirable effects.
 
-def correlation(x, y):
+    Args:
+        x (np.ndarray): array to slide a window over
+        size (int): window size
+        step (int, optional): step. Defaults to 1.
 
-    if len(x.shape) == 1:
-        x = x[...,np.newaxis]
-    if len(y.shape) == 1:
-        y = y[...,np.newaxis]
-    
-    xx, yy = x - x.mean(0), y - y.mean(0)
-    xy = xx.T[...,np.newaxis] * yy[np.newaxis,...]
-    xys = xy.sum(len(xx.shape)-1)
-    xs,ys = (xx*xx).sum(0), (yy*yy).sum(0)
-    xxyys = np.sqrt(xs[...,np.newaxis] * ys[np.newaxis,...])
-    return xys / xxyys
-'''
+    Returns:
+        numpy.ndarray: 2D windowed array
+    """
+    return np.lib.stride_tricks.as_strided(x, shape=(x.shape[0]//step - int(np.ceil(size/step)) + 1, size), strides=(x.strides[0]*step,x.strides[0]))
+
+
 
 def correlation(x, y):
     """ Compute correlation of x and y. Assumes [n,...] for x and y where n is the number of samples.

@@ -14,38 +14,51 @@ from collections import namedtuple
 
 from ..visutils import transform as T
 
-
-def stack(states, frames=3, step=1):
-    assert len(states.shape) == 4  # BCHW format
-    # must be in BCHW format, RGB channels not implemented yet...
-    assert states.shape[1] == 1
-
-    result = np.empty(
-        (states.shape[0], states.shape[1] * frames, *states.shape[2:]))
-
-    result[:, 0] = states[:, 0]
-    for i in range(1, frames):
-        result[i*step:, i] = states[:-i*step, 0]
-        result[:i*step, i] = np.zeros((i*step, *states.shape[2:]))
-
-    return result
+def stack(states, frames=3, copy=True):
+    """ Stack states. with an input of states [s1, s2, ..., sn] where each state is a grayscale image, the output will is given as:
 
 
+    Args:
+        states (numpy.ndarray): states [s1, s2, ..., sn] as images NHWC format.
+        frames (int, optional): number of states to stack. Defaults to 3.
+        copy (bool, optional): create a new array to store the ouput. WARNING: without a copy, modifying the array can have undesirable effects as stride_tricks is used. Defaults to True.
 
-def maxpool(state, factor=2):
+    Returns:
+        numpy.ndarray: stacked states
+    """
+    states = states.squeeze() #remove channels
+    shape = states.shape
+    assert len(shape) == 3 # NHW format
+
+    # stack frames
+    stacked = np.lib.stride_tricks.as_strided(states, shape=(shape[0] - frames, *shape[1:], frames), strides=(*states.strides, states.strides[0]))
+    if copy:
+        stacked = np.copy(stacked)
+    return stacked
+
+
+
+
+
+def maxpool(state, factor=2): #TODO...
     input_size = 128
     output_size = 64
     bin_size = input_size // output_size
     small_image = large_image.reshape((output_size, bin_size, 
                                    output_size, bin_size, 3)).max(3).max(1)
 
-def atari_transform(states):
-    states = T.to_float(states)
-    states = T.gray_all(states)
-    print(states.shape)
-    states = T.resize_all(
-        states, (84, 110), interpolation=T.interpolation.area)
-    states = T.crop_all(states, ysize=(18, 102))
+def atari(states):
+    """ Transformation specific to the Atari suit of games provided by the Arcade Learning Environment (ALE). The states is assumed to be in NHWC format.
+
+    Args:
+        states (np.ndarray): a collection of states from an Atari game, NHWC format
+
+    Returns:
+        np.ndarray: transformed states
+    """
+    states = T.grey(states, components=(0.299, 0.587, 0.114))
+    states = T.resize(states, 84, 110)
+    states = T.crop_all(states, ysize=(18, 102)) #TODO swap resize/crop for efficiency.
     return states
 
 

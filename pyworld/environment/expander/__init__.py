@@ -20,13 +20,15 @@ class Player:
         self.center = center
         self.radius = radius
         self.size = np.array([w,h])
-        self.speed = 2
+        self.speed = speed
 
     @property
     def position(self):
         cx, cy = self.center
         r, a = self.radius, self.angle
         return np.array([cx + r * np.cos(a) - self.size[0]/2, cy + r * np.sin(a) - self.size[1]/2])
+
+
   
 physics = [
     {"left":1, "right":-1},                           # simple
@@ -35,15 +37,18 @@ physics = [
 
 DEG2RAD = np.pi/180
 
-class Circular(PyGameEnvironment):
+class Expander(PyGameEnvironment):
 
-    def __init__(self, size=DEFAULT_SIZE, physics=physics[0], dtype=np.float32, format="CHW"):
-        super(Circular, self).__init__(list(physics.keys()), display_size=size, background_colour=(0,0,0), format=format, dtype=dtype)
+    def __init__(self, size=DEFAULT_SIZE, physics=physics[0], dtype=np.float32, format="CHW", speed=2):
+        super(Expander, self).__init__(list(physics.keys()), display_size=size, background_colour=(0,0,0), format=format, dtype=dtype)
         self.physics = physics
         radius = min(size) / 3
-        self.player1 = Player((size[0]/2, size[1]/2), radius, 0, size[0]/8, size[1]/8)
+        self.player1 = Player((size[0]/2, size[1]/2), radius, 0, size[0]/8, size[1]/8, speed=speed)
         self.__initial_state = copy.deepcopy(self.player1)
 
+        self.expand = 0 #current size of the expansion
+
+    """
     def cover(self):
         assert isinstance(self.unwrapped, Circular)
         self.reset()
@@ -52,20 +57,30 @@ class Circular(PyGameEnvironment):
         cover = np.array(cover)
         self.reset()
         return cover, np.zeros(cover.shape[0])
+    """
 
     def step(self, action):
         #update state
         self.player1.angle += DEG2RAD * self.player1.speed * self.physics[self.actions[action]]
+        self.expand += 1
         # update graphics
         self.clear(self.background_colour) 
-        self.fill_rect(self.player1.position, self.player1.size)
-        return self.get_image(), 0., False, None
+        
+        w,h = self.display_size
+        self.fill_rect((w/2 - self.expand/2, h/2-self.expand/2), (self.expand,self.expand), colour=(255,0,0))
+        self.fill_rect(self.player1.position, self.player1.size, colour=(0,255,0))
+
+        return self.get_image(), 0., self.expand > min(w,h), None
 
     def reset(self):
         self.player1 = copy.deepcopy(self.__initial_state)
         self.player1.angle = np.random.uniform(0, np.pi*2)
 
         self.clear(self.background_colour) # clear graphics buffer
-        self.fill_rect(self.player1.position, self.player1.size)
+        self.fill_rect(self.player1.position, self.player1.size, colour=(0,255,0))
+        self.expand = 0
 
         return self.get_image()
+
+def ExpanderNoop():
+    return Expander(physics=physics[1], speed=5)

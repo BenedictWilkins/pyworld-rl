@@ -179,8 +179,6 @@ class sars(observation):
 
 def pack(observations):
     """ 
-        Packs a list of observations into a list of numpy arrays (one for each observation attribute)
-    Args:
-        (numpy.ndarray, ...) : one ndarray for each observation
+        Packs a list of observations
     """
     return tuple([np.array(d) for d in [i for i in zip(*observations)]])

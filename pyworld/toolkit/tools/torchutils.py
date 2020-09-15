@@ -17,6 +17,13 @@ from . import datautils as du
 
 
 
+def unit_vector(x):
+    """ 
+        Convert a batch of vectors a batch of unit vectors
+    """
+    assert len(x.shape) == 2
+    return x / torch.norm(x, dim=-1, keepdim=True) 
+
 
 
 
@@ -60,6 +67,28 @@ def distance_matrix(x, y):
         sq_dist = torch.sum((r_v - y) ** 2, 1)
         dist_mat[i] = sq_dist.view(1, -1)
     return dist_mat    
+
+def from_numpy(x, *y, device='cpu'):
+    """ Converts x to a torch tensor.
+
+        Args:
+            x (np.ndarray, tuple)
+            y ([np.ndarray, tuple])
+    """
+    def _from_numpy(x):
+        if isinstance(x, tuple):
+            return tuple([_from_numpy(y) for y in x])
+        if isinstance(x, np.ndarray):
+            return torch.from_numpy(x).to(device)
+        else:
+            raise TypeError(type(x))
+        
+    if isinstance(x, tuple):
+        return _from_numpy(tuple([*x, *y]))
+    elif len(y) > 0:
+        return _from_numpy(tuple([x, *y]))
+    else:
+        return _from_numpy(x)
 
 def to_numpy(x, *y):
     '''

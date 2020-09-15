@@ -32,7 +32,7 @@ class ObjectMover(gym.Env):
     '''
         ObjectMover is an environment in which a single object can be moved around in the cardinal directions.
     '''
-    def __init__(self, shape, obj, base_vel=1.0, cinvert=False, mode=mode_image, none_action=False):
+    def __init__(self, shape, obj, base_vel=1.0, cinvert=False, mode=mode_image, noop=False):
         super(ObjectMover, self).__init__()
         assert len(shape) == 3
         assert shape[0] == 1 or shape[0] == 3
@@ -49,16 +49,17 @@ class ObjectMover(gym.Env):
         self.mode = [self.mode_image, self.mode_position, self.mode_image_position][mode]
 
             
-        self.v_map = {0:np.array([0.,-base_vel]),1:np.array([0.,base_vel]),
-                      2:np.array([-base_vel,0.]),3:np.array([base_vel,0.]),
+        self.v_map = {0:np.array([0.,-base_vel]),1:np.array([base_vel,0.]),
+                      2:np.array([0.,base_vel]), 3:np.array([-base_vel,0.]),
                       4:np.array([0.,0.])}
-        self.action_labels = {0:'NORTH', 1:'SOUTH', 2:'EAST', 3:'WEST', 4:'NONE'}
+        self.action_labels = {0:'NORTH', 1:'EAST', 2:'SOUTH', 3:'WEST', 4:'NOOP'}
 
-        self.action_space = gym.spaces.Discrete(4 + int(none_action))
+        self.action_space = gym.spaces.Discrete(4 + int(noop))
         self.observation_space = gym.spaces.Box(low=np.float32(0.), high=np.float32(1.), shape=shape, dtype=np.float32)
-        
-    def get_action_meanings(self):
-        return [self.action_labels[i] for i in range(len(self.action_labels))]
+    
+    @property
+    def action_meanings(self):
+        return [self.action_labels[i] for i in range(self.action_space.n)]
     
     def sample_step(self, position, policy):
         self.obj.pos = position
@@ -69,25 +70,15 @@ class ObjectMover(gym.Env):
         nstate, action, _, _ = self.step(action)
         return state, 0., nstate
 
-    @staticmethod
-    def cover(self, x=100, y=100):
-        """ 
-            Returns all posssible states of the game.
-        """
-        y = min(y, self.observation_space.shape[1] + 1)
-        x = min(x, self.observation_space.shape[2] + 1)
+    def cover(self): 
+        actions = []
+        for i in range(1, self.observation_space.shape[-1]//2 - self.obj.img.shape[-1]//2, 2):
+            for j in range(4): #dont include NOOP...?
+                actions.extend([j]*(i + j//2))
 
-        y_space = np.linspace(0,self.observation_space.shape[1], num=x)
-        x_space = np.linspace(0,self.observation_space.shape[2], num=y)
-        x, y = np.meshgrid(x_space, y_space)
-        z = np.empty((x.size, *self.observation_space.shape), dtype=self.observation_space.dtype)
-
-        for i, c in enumerate(zip(x.flatten(), y.flatten())):
-            self.obj.pos = c
-            self.__place()
-            z[i] = self.state
-
-        return z, None #TODO action cover?
+        state = self.reset()
+        states = [state] + [self.step(a)[0] for a in actions]
+        return  np.array(states), np.array(actions + [0])
         
     def step(self, action):
         self.obj.vel = self.v_map[action]
@@ -141,7 +132,7 @@ class ObjectMover(gym.Env):
             return True
         return False
 
-def a(shape=(1,64,64), mode=mode_image, none_action=False):
+def a(shape=(1,64,64), mode=mode_image, noop=False):
     from PIL import Image, ImageDraw, ImageFont
     import os
     #img = PIL.Image.open('imgs/a.png'))
@@ -155,11 +146,14 @@ def a(shape=(1,64,64), mode=mode_image, none_action=False):
     
     obj_pos = (np.array(shape) / 2 - np.array(obj_image.shape) / 2)[1:]
 
-    return ObjectMover(shape, Object(obj_image, obj_pos), 2., mode=mode, none_action=none_action)    
+    return ObjectMover(shape, Object(obj_image, obj_pos), 2., mode=mode, noop=noop)    
 
 
-def default(mode=mode_image, none_action=False):
-    return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode, none_action=none_action)
+def default(*args, **kwargs):
+    return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode_image, noop=False)
+
+def noop(*args, **kwargs):
+    return ObjectMover((1,64,64), Object(np.ones((1,12,12)), np.array([26.,26.])), 2., mode=mode_image, noop=True)
 
 def stochastic1():
     class vmap:

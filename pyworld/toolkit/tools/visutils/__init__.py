@@ -26,6 +26,7 @@ from .. import fileutils as fu
 from .. import datautils as du
 from .. import torchutils as tu
 
+from . import colour
 from . import transform
 from . import animation
 from . import detection
@@ -39,6 +40,7 @@ except:
     mpy = None
 
 __all__ = ('transform', 'animation', 'detection', 'plot')
+
 
 def hstitch(images):
     pass
@@ -63,7 +65,7 @@ def grid(domain, n=100):
     if isinstance(domain, (int, float)):
         domain = ((-domain/2, domain/2), (-domain/2, domain/2))
     else:
-        raise NotImplementedError("TODO")
+        pass # raise NotImplementedError("TODO")
 
     z1, z2 = np.meshgrid(np.linspace(domain[0][0],domain[0][1],n), np.linspace(domain[1][0],domain[1][1],n))
     z1, z2 = z1.flatten()[:,np.newaxis], z2.flatten()[:,np.newaxis]
@@ -379,7 +381,10 @@ def gallery(images, cols=3):
     return result
 
 def hgallery(x, n=10):
-    assert transform.isHWC(x)
+    if transform.isCHW(x):
+        if not transform.isHWC(x):
+            x = transform.HWC(x)
+
     if n is None:
         n = x.shape[0]
     m,h,w,c = x.shape
