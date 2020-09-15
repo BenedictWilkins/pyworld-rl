@@ -6,17 +6,23 @@ Created on Tue Mar 19 13:12:18 2019
 @author: ben
 """
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='pyworld',
       version='0.0.1',
-      description='Agent library compatible with openai-gym',
+      description='',
       url='',
       author='Benedict Wilkins',
-      author_email='brjw@hotmail.co.uk',
-      license='MIT',
-      packages=['pyworld'],
-      install_requires=["opencv-python", "matplotlib", "numpy",
-                        "plotly", "ipywidgets", "ipycanvas", "jupyterlab"
+      author_email='benrjw@gmail.com',
+      packages=find_packages(),
+      install_requires=["opencv-python", 
+                        "scikit-image",
+                        "matplotlib", 
+                        "numpy",
+                        "plotly", 
+                        "gym[atari]",
+                        "ipywidgets", 
+                        "ipycanvas", 
+                        "jupyterlab",
                         "h5py"],
       zip_safe=False)
