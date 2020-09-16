@@ -10,16 +10,10 @@ __email__ = "benrjw@gmail.com"
 __status__ = "Development"
 
 import os
-os.putenv('SDL_VIDEODRIVER', 'fbcon')
-os.environ["SDL_VIDEODRIVER"] = 'dummy'
 
 from gym.envs.registration import register as gym_register
 from gym.envs.registration import registry as gym_registry
 import copy
-
-from . import pygame
-
-__all__ = ('pygame',) 
 
 envs = {}
 
@@ -44,37 +38,12 @@ def register(id, entry_point, **kwargs):
             print("warning: failed to register environment\n" + str(e))
     envs[id] = (entry_point, kwargs)
 
-register(id="Circular-v0", entry_point='pyworld.environment.circular:Circular')
-
-register(id="Expander-v0", entry_point='pyworld.environment.expander:Expander')
-register(id="Expander-v1", entry_point='pyworld.environment.expander:ExpanderNoop')
-
-register(id="Paddles-v0", entry_point='pyworld.environment.paddles:Paddles')
-register(id="Paddles-v1", entry_point='pyworld.environment.paddles:PaddlesShared')
-register(id="Paddles-v2", entry_point='pyworld.environment.paddles:PaddlesAlternative')
-
-register(id="Paddles-noop-v0", entry_point='pyworld.environment.paddles:PaddlesNoop') ## ?? be consistent in the nameing
 
 register(id='ObjectMover-v0', entry_point='pyworld.environment.objectmover:default')
 register(id='ObjectMover-v1', entry_point='pyworld.environment.objectmover:a', kwargs = {'shape':(1,64,64)})
 register(id='ObjectMover-v2', entry_point='pyworld.environment.objectmover:noop')
 
 register(id="ObjectMover-v3", entry_point='pyworld.environment.objectmover:stochastic1')
-
-register(id='CoinCollector-Easy-v0', 
-    entry_point='pyworld.environment.pygame.CoinCollector:CoinCollector', kwargs = {'jump':False, 'speed':False})
-
-register(id='CoinCollector-NoJump-v0', 
-    entry_point='pyworld.environment.pygame.CoinCollector:CoinCollector', kwargs = {'jump':False, 'speed':True})
-
-register(id='CoinCollector-NoSpeed-v0', 
-    entry_point='pyworld.environment.pygame.CoinCollector:CoinCollector', kwargs = {'jump':True, 'speed':False})
-
-register(id='CoinCollector-Hard-v0', 
-    entry_point='pyworld.environments.pygame.CoinCollector:CoinCollector', kwargs = {'jump':True, 'speed':True})
-
-
-
 
 '''
 from gym import envs
