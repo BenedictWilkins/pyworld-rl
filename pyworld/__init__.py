@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Tue Mar 19 13:12:44 2019
+    Created on 16-09-2020 10:47:08
 
-@author: ben
+    [Description]
 """
-
-#from . import agent
-#from . import simulate
-#from . import params
-#from . import model
-#from .algorithms.policygradient import PolicyGradient
+__author__ = "Benedict Wilkins"
+__email__ = "benrjw@gmail.com"
+__status__ = "Development"
 
 from . import toolkit
 from . import algorithms

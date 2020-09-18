@@ -86,7 +86,7 @@ def grey(image, components=(0.299, 0.587, 0.114)): #(N)HW(C) format
 
     return r((image[...,0] * components[0] + image[...,1] * components[1] + image[...,2] * components[2])[...,np.newaxis].astype(image.dtype))
 
-def colour(image, components=(1/0.299, 1/0.587, 1/0.114)):
+def colour(image, components=(1,1,1)):
     """
     Args:
         image ([type]): [description]

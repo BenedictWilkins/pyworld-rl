@@ -24,5 +24,10 @@ setup(name='pyworld',
                         "ipywidgets", 
                         "ipycanvas", 
                         "jupyterlab",
-                        "h5py"],
+                        "h5py",
+                        "torch"],
       zip_safe=False)
+
+# NOTE: opencv requires ffmpeg
+
+
